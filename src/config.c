@@ -31,7 +31,7 @@ struct nm_config_file_t {
 // - Windows: [Tt]humbs.db, desktop.ini
 static int nm_config_files_filter(const struct dirent *de) {
     const char *bn = de->d_name;
-    char *ex = strrchr(bn, '.');
+    const char *ex = strrchr(bn, '.');
     ex = (ex && ex != bn && bn[0] != '.') ? ex : NULL;
     char lc = bn[strlen(bn)-1];
     if ((bn[0] == '.') ||
@@ -515,7 +515,7 @@ static bool nm_config_parse__lineend_action(int field, char **line, bool p_on_su
 
     char *s_act = strtrim(strsep(line, ":"));
     if (!s_act) NM_ERR_RET(true, "field %d: expected action, got end of line", field);
-    #define X(name) \
+    #define X(name, fw4, fw5) \
     else if (!strcmp(s_act, #name)) act_out->act = NM_ACTION(name);
     NM_ACTIONS
     #undef X

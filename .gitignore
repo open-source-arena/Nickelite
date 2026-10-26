@@ -19,3 +19,15 @@ compile_commands.json
 /src/action_cc.o
 /src/nickelmenu.o
 test.syms
+
+*.d
+*.o
+/Kobo.tgz
+/dist/
+/docs/evidence/
+/src/embedded_resources.h
+/test/qt_compat
+/test/qt_compat.d
+/test/compat
+/test/compat.d
+/src/install.o
