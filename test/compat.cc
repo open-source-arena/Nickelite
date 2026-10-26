@@ -1,5 +1,4 @@
 #include "../src/compat.h"
-#include "../src/cloud.h"
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 struct NmAbiFunction { const char *name; size_t size; const char *sha256; };
 #include "../src/compat_data.h"
@@ -7,10 +6,8 @@ struct NmAbiFunction { const char *name; size_t size; const char *sha256; };
 #include <cassert>
 #include <cstdio>
 #include <QCoreApplication>
-#include <QSharedPointer>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <utility>
 
 int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
@@ -23,35 +20,6 @@ int main(int argc, char **argv) {
     assert(!std::strcmp(error, "symbol is not readable executable code"));
     assert(!nh_native_range(nullptr, 8, PF_R));
     assert(!nh_native_range(reinterpret_cast<void *>(1), SIZE_MAX, PF_R));
-    assert(!nm_cloud_profile_error(false, false, false, false));
-    assert(!std::strcmp(nm_cloud_profile_error(true, false, false, false), "cloud access is disabled in demo mode"));
-    assert(!std::strcmp(nm_cloud_profile_error(false, true, false, false), "cloud access is disabled for child accounts"));
-    assert(!std::strcmp(nm_cloud_profile_error(false, false, true, false), "cloud access is disabled by parental controls"));
-    assert(!std::strcmp(nm_cloud_profile_error(false, false, false, true), "cloud access requires a normal Kobo account profile"));
-    auto getUser = reinterpret_cast<void (*)(void *, const QString &)>(nm_resolve("_ZN11UserManager15getUserOnDeviceERK7QString"));
-    auto isChild = reinterpret_cast<bool (*)(const void *)>(nm_resolve("_ZNK4User14isChildAccountEv"));
-    auto destroyUser = reinterpret_cast<void (*)(void *)>(nm_resolve("_ZN4UserD1Ev"));
-    assert(getUser && isChild && destroyUser);
-    void *user = nh_native_storage("User");
-    assert(user);
-    getUser(user, QString());
-    assert(!isChild(user)); // The test profile has no child account.
-    destroyUser(user);
-    ::operator delete(user);
-    static_assert(sizeof(QSharedPointer<QObject>) == 2 * sizeof(void *), "native workflow shared-pointer ABI changed");
-    for (const auto &cloud : {
-            std::make_pair("DropboxWorkflowManager", "_ZN22DropboxWorkflowManager14sharedInstanceEv"),
-            std::make_pair("GDriveWorkflowManager", "_ZN21GDriveWorkflowManager14sharedInstanceEv")}) {
-        auto shared = reinterpret_cast<QSharedPointer<QObject> (*)()>(nm_resolve(cloud.second));
-        assert(shared);
-        auto first = shared();
-        assert(first && first->inherits(cloud.first));
-        {
-            auto second = shared();
-            assert(second.data() == first.data());
-        }
-        assert(first->inherits(cloud.first));
-    }
     for (const char *name : {"MainNavButton", "MenuTextItem", "NickelTouchMenu", "MoreController",
             "BrowserWorkflowManager", "LightMenuSeparator", "BoldMenuSeparator", "SettingItemWithCheckBox"}) {
         assert(nh_native_type(name).isValid());
@@ -100,5 +68,5 @@ int main(int argc, char **argv) {
     vtable[4] = originalSlot;
     assert(nm_resolve("_ZTV15FeatureSettings"));
     assert(!mprotect(vtablePage, pageSize, PROT_READ));
-    puts("PASS: cloud profile denials and User return ABI, native workflow ownership, symbol/size/vtable guards");
+    puts("PASS: symbol/size/vtable guards");
 }

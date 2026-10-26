@@ -1,11 +1,9 @@
 #include "compat.h"
-#include "cloud.h"
 #include <memory>
 #include <QApplication>
 #include <QByteArray>
 #include <QProcess>
 #include <QScreen>
-#include <QSharedPointer>
 #include <QShowEvent>
 #include <QString>
 #include <QStringList>
@@ -129,55 +127,6 @@ SettingsSymbols prepare_Settings_symbols() {
     return symbols;
 }
 
-#if NM_QT_MAJOR >= 6
-static bool nm_cloud_profile_allowed() {
-    Device *dev = get_Device_getCurrentDevice();
-    NM_CHECK(false, dev, "current Device unavailable for cloud profile check");
-    bool (*parental)(Device *), (*demo)(Settings *), (*sideloaded)(Settings *), (*child)(const void *);
-    void (*getUser)(void *, const QString &), (*destroyUser)(void *);
-    //libnickel 6.0 * _ZNK6Device24isParentalControlEnabledEv
-    NM_ACT_SYM(parental, "_ZNK6Device24isParentalControlEnabledEv");
-    //libnickel 6.0 * _ZN19ApplicationSettings15demoModeEnabledEv
-    NM_ACT_SYM(demo, "_ZN19ApplicationSettings15demoModeEnabledEv");
-    //libnickel 6.0 * _ZN19ApplicationSettings14sideloadedModeEv
-    NM_ACT_SYM(sideloaded, "_ZN19ApplicationSettings14sideloadedModeEv");
-    //libnickel 6.0 * _ZNK4User14isChildAccountEv
-    NM_ACT_SYM(child, "_ZNK4User14isChildAccountEv");
-    //libnickel 6.0 * _ZN11UserManager15getUserOnDeviceERK7QString
-    NM_ACT_SYM(getUser, "_ZN11UserManager15getUserOnDeviceERK7QString");
-    //libnickel 6.0 * _ZN4UserD1Ev
-    NM_ACT_SYM(destroyUser, "_ZN4UserD1Ev");
-    NM_CHECK(false, parental && demo && sideloaded && child && getUser && destroyUser,
-        "native cloud profile predicates unavailable");
-    void *applicationVtable = nm_resolve("_ZTV19ApplicationSettings");
-    NM_CHECK(false, applicationVtable, "ApplicationSettings ABI unavailable for cloud profile check");
-    const auto settingsSymbols = prepare_Settings_symbols();
-    NM_CHECK(false, !nm_err_peek(), "Settings ABI unavailable for cloud profile check");
-    Settings *settings = alloca(128);
-    settingsSymbols.Settings_Settings(settings, dev, false);
-    auto destroySettings = [settingsSymbols](Settings *value) { settingsSymbols.Settings_SettingsD(value); };
-    std::unique_ptr<Settings, decltype(destroySettings)> settingsLifetime(settings, destroySettings);
-    *reinterpret_cast<void ***>(settings) = static_cast<void **>(applicationVtable) + 2;
-    const bool demoMode = demo(settings);
-    *reinterpret_cast<void ***>(settings) = static_cast<void **>(applicationVtable) + 2;
-    const bool sideloadedMode = sideloaded(settings);
-
-    auto releaseStorage = [](void *value) { ::operator delete(value); };
-    std::unique_ptr<void, decltype(releaseStorage)> user(nh_native_storage("User"), releaseStorage);
-    NM_CHECK(false, user, "native User metadata unavailable for cloud profile check");
-    // User is a nontrivial ARM return value: the native getter constructs it in r0's storage.
-    getUser(user.get(), QString());
-    std::unique_ptr<void, decltype(destroyUser)> userLifetime(user.get(), destroyUser);
-    const char *denial = nm_cloud_profile_error(demoMode, child(user.get()), parental(dev), sideloadedMode);
-    if (denial) {
-        nm_err_set("%s", denial);
-        return false;
-    }
-    return true;
-}
-#endif
-
-
 NM_ACTION_(nickel_open) {
     char *tmp1 = strdupa(arg); // strsep and strtrim will modify it
     char *arg1 = strtrim(strsep(&tmp1, ":"));
@@ -190,28 +139,8 @@ NM_ACTION_(nickel_open) {
         NM_ERR_RET(nullptr, "nickel_open view '%s:%s' is not supported on Qt 6 firmware", arg1, arg2);
 
     if (!strcmp(arg1, "library") && (!strcmp(arg2, "dropbox") || !strcmp(arg2, "gdrive"))) {
-        if (!nm_cloud_profile_allowed()) return nullptr;
-        QSharedPointer<QObject> (*sharedInstance)();
-        void (*show)(QObject *);
-        const bool dropbox = !strcmp(arg2, "dropbox");
-        if (dropbox) {
-            //libnickel 6.0 * _ZN22DropboxWorkflowManager14sharedInstanceEv
-            NM_ACT_XSYM(sharedInstance, "_ZN22DropboxWorkflowManager14sharedInstanceEv", "could not resolve DropboxWorkflowManager::sharedInstance");
-            //libnickel 6.0 * _ZN22DropboxWorkflowManager4showEv
-            NM_ACT_XSYM(show, "_ZN22DropboxWorkflowManager4showEv", "could not resolve DropboxWorkflowManager::show");
-        } else {
-            //libnickel 6.0 * _ZN21GDriveWorkflowManager14sharedInstanceEv
-            NM_ACT_XSYM(sharedInstance, "_ZN21GDriveWorkflowManager14sharedInstanceEv", "could not resolve GDriveWorkflowManager::sharedInstance");
-            //libnickel 6.0 * _ZN21GDriveWorkflowManager4showEv
-            NM_ACT_XSYM(show, "_ZN21GDriveWorkflowManager4showEv", "could not resolve GDriveWorkflowManager::show");
-        }
-        // Keep the native manager alive during its Wi-Fi and OAuth callbacks.
-        static QSharedPointer<QObject> dropboxWorkflow, gdriveWorkflow;
-        auto &workflow = dropbox ? dropboxWorkflow : gdriveWorkflow;
-        if (!workflow) workflow = sharedInstance();
-        NM_CHECK(nullptr, workflow, "native cloud workflow unavailable");
-        show(workflow.data());
-        return nm_action_result_silent();
+        NM_ERR_RET(nullptr,
+            "Dropbox and Google Drive actions are disabled on Qt 6 firmware after a reported device panic");
     }
 #endif
 

@@ -1,7 +1,10 @@
 #include "../src/nickelmenu.cc"
+#include "../src/action.h"
+#include "../src/util.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <cassert>
+#include <cstring>
 
 extern "C" void nh_log(const char *, ...) {}
 extern "C" bool nh_delete_file(const char *) { std::abort(); }
@@ -17,6 +20,15 @@ static MainNavView *original_constructor(MainNavView *view, QWidget *parent) {
 }
 
 int main() {
+    for (const char *provider : {"dropbox", "gdrive"}) {
+        const QString arg = QStringLiteral("library:") + provider;
+        assert(!nm_action_nickel_open(arg.toUtf8().constData()));
+        const char *error = nm_err_peek();
+        const char *expected = "Dropbox and Google Drive actions are disabled on Qt 6 firmware after a reported device panic";
+        assert(error && !std::strncmp(error, expected, std::strlen(expected)));
+        nm_err_set(nullptr);
+    }
+
     // Missing optional symbols take the production hook's early-exit path.
     // No QWidget is accessed before that check, so opaque tokens suffice.
     expected_view = reinterpret_cast<MainNavView *>(uintptr_t(0x1000));

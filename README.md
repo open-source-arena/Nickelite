@@ -13,12 +13,13 @@ and vendors its [NickelHook dependency](https://github.com/nicoverbruggen/Nickel
 with a local fix to restore GOT page protection after hooking or rollback.
 The original MIT license and authorship apply. This is an unofficial development
 build, tested locally against that exact firmware and on one Clara BW (N365).
-On that device the owner confirmed that both Dropbox and Google Drive linked
-successfully and displayed their native file lists. An initial Get Started
-Loading stall was transient. Fixture download/open, byte preservation and file
-sync remain unverified. USB Connect mounts storage, but
-after eject/unplug the stale Connected screen needs a short normal power press.
-See [the compatibility results](docs/action-compatibility-6.md) for the limits.
+The owner first reported successful Dropbox and Google Drive linking and file
+listing, then reported that using both cloud services caused the physical reader
+to panic. The cause and exact failure stage are unknown. **Qt6 Dropbox and Google
+Drive actions are disabled in this source. Do not invoke cloud actions from an
+older installed build.** Once the reader is back at a normal screen, update only
+through the stock USB installation path described below; do not sign out, reset,
+or use firmware recovery. See [the compatibility results](docs/action-compatibility-6.md).
 A successful build or symbol check does not establish compatibility with other
 6.x releases or devices.
 

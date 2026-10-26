@@ -1,7 +1,8 @@
 # NickelMenu actions on firmware 6.0.274403
 
 Checked 2026-10-26 against Kobo Clara BW (N365). This report separates the
-original offline simulator baseline from the later physical cloud candidate.
+original offline simulator baseline from the later physical cloud candidate
+and subsequent panic report.
 Generated logs, screenshots, settings, test EPUBs and firmware disassembly are
 excluded from publication; the observations below are aggregate findings.
 
@@ -20,73 +21,43 @@ The old local `dist/` package is the earlier baseline and is not this candidate.
 
 | Feature | Physical outcome | Remaining limit |
 |---|---|---|
-| Dropbox | **Entry, authentication/linking and native listing PASS by owner report.** Get Started initially showed Loading for more than one minute; Back worked. The stall recovered and the account linked successfully with its file list visible. | Fixture download/open, byte preservation and actual file sync are unverified. |
-| Google Drive | **Entry, authentication/linking and native listing PASS by owner report.** Get Started initially showed Loading for more than one minute; Back worked. The stall recovered and the account linked successfully with its file list visible. | Fixture download/open, byte preservation and actual file sync are unverified. |
+| Dropbox | Earlier linking and native listing were reported as successful. A later owner report says using the service caused the reader to panic. **Qt6 action disabled in source.** | Exact trigger, failure stage, recovery state and data impact are unknown. Do not retest. |
+| Google Drive | Earlier linking and native listing were reported as successful. A later owner report says using the service caused the reader to panic. **Qt6 action disabled in source.** | Exact trigger, failure stage, recovery state and data impact are unknown. Do not retest. |
 | USB Connect | **PARTIAL.** Connect mounts the reader's storage. After safe eject and unplug, the stale Connected screen needs a short normal power press to restore the GUI. | Seamless disconnect recovery is not established; this is not a verified USB recovery fix. |
 
 During the initial stall, neither service showed an error, link code, OAuth
-screen or file list. The owner subsequently confirmed that **both services
-linked successfully and displayed their file lists**. This supersedes a
-continuing-blocker interpretation; the transient stall's cause remains unknown.
-No credentials, actual authentication codes or private file identities were
-supplied or retained. Linking and listing do not establish successful file
-transfer, byte preservation or sync.
+screen or file list. The earlier linking/listing report is historical and does
+not establish service safety. The later panic report supersedes it for current
+guidance. No panic log or precise failure point is available, and no credentials,
+authentication codes or private file identities were supplied or retained.
 
-## Minimal reproduction and diagnostics
+## Safety and current implementation
 
-Use the exact firmware and a normal profile with working native Wi-Fi. Do not
-change account/profile restrictions to make the test pass. Add a separate
-`.adds/nm/cloud-check` text file with:
+**Do not reproduce or retest cloud access on the physical reader.** The source
+now rejects both Qt6 cloud actions before native workflow construction. Once the
+reader is back at a normal screen, any source update must use the stock USB
+installation path in the README; this does not authorize another cloud attempt.
+The [original EPUB fixtures](test-fixtures/README.md) are retained for a future
+test only after the native route is independently reviewed and re-enabled.
 
-```text
-menu_item:main:Dropbox check:nickel_open:library:dropbox
-menu_item:main:Google Drive check:nickel_open:library:gdrive
-```
-
-1. Record firmware version and the SHA256 of the newly built package and payload.
-   The README describes rebuilding and installation.
-2. Open one entry and confirm the provider's native Get Started screen. Press
-   Get Started, wait at least 60 seconds, and record whether Loading completes,
-   an error appears, or a link code/OAuth screen appears. Test Back, then repeat
-   for the other provider. Keep entry and authentication results separate.
-3. If the earlier stall recurs, record elapsed time, Wi-Fi connection state and whether another
-   ordinary native network action works. If a stock provider entry is available,
-   compare its result. Do not infer provider reachability from Wi-Fi alone.
-4. If SSH is already available, inspect `logread` locally around the reproduction.
-   Retain only relevant errors; redact account identifiers, tokens, codes and
-   network details before sharing. No device reset, sign-out or firmware rollback
-   is needed for this diagnostic.
-
-The [original reusable EPUB fixtures](test-fixtures/README.md) provide a bounded
-future transfer test without private content. Record
-download/open separately from byte-hash comparison and actual sync behavior.
-Only successful linking and visible native file lists have been reported; no
-private account contents are recorded here and folder-wide sync or Download all
-was not tested.
-
-## Qt6 cloud routing and guard
+## Qt6 cloud routing status
 
 The original Qt6 port used `MoreController` cloud methods, which check native
-service visibility before showing the provider workflow. Both entries silently
-returned on the physical N365 before the restoration. The device's cloud service
-flags were false; its sideloaded-mode key was absent. That differs from the
-simulator's explicit `SideloadedMode=true` and does not establish an identical
-cause on the physical device.
+service visibility before showing provider workflows. The later implementation
+bypassed those gates and called native Dropbox/Google Drive workflow managers
+directly. The physical N365's cloud service flags had been observed false before
+that restoration. This is a source-supported risk, not a proven cause of the
+reported panic.
 
-Qt6 now calls the native Dropbox/Google Drive workflow managers directly and
-retains their native `QSharedPointer` handles for asynchronous callbacks. The
-native Wi-Fi/authentication implementation remains responsible for the flow.
-The shared guard checks effective demo, child-account, parental-control and
-sideloaded-profile restrictions and fails closed when required symbols or native
-metadata are missing. No account/token state or saved preferences are fabricated.
-Qt5 routing is unchanged.
+Both Qt6 cloud actions now return an error before resolving or constructing
+native cloud objects. This is containment; it does not establish the cause of
+the panic or a functional cloud fix. Qt5 routing is unchanged. Do not test these
+actions on the device until the native route has been reviewed and re-enabled.
 
-Local Go regressions, isolated Qt6 build and exact-firmware ARM checks passed for
-the reviewed candidate. ARM checks cover profile denials, native User construction
-and destruction, both workflow QObject classes, and shared-handle ownership.
-These checks validate ABI/guard behavior, not service availability. An earlier
-unguarded candidate reached native network handling in the offline guest; the
-final guarded Dropbox action correctly rejected its sideloaded profile.
+The earlier candidate's Go, Qt6 build and exact-firmware ARM checks do not cover
+the later-reported panic. Updated checks verify the disabled-action message; they
+do not execute cloud workflows. No device-side verification has been performed
+for the containment change.
 
 ## Publication verification (2026-10-26)
 
@@ -123,6 +94,6 @@ Those identities predate the cloud restoration.
 
 Private firmware inspection supported the baseline gating explanation; it did not
 trace the exact executed branch or demonstrate an empty landing-page URL. The
-source changes and current physical observations supersede the baseline cloud
-entry result, while the later owner report establishes linking/listing for both services.
-File transfer and sync remain unverified.
+source changes supersede the baseline cloud-entry result. The earlier owner
+report of linking/listing is superseded for safety guidance by the later panic
+report; neither report establishes successful file transfer or sync.

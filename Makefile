@@ -42,7 +42,7 @@ test/qt_compat: test/qt_compat.cc src/nickelmenu.cc $(filter-out src/nickelmenu.
 
 ifeq ($(NH_QT_MAJOR),6)
 override GENERATED += src/embedded_resources.h test/compat test/compat.d
-test/compat: test/compat.cc src/compat.h src/compat_data.h src/native.h src/cloud.h
+test/compat: test/compat.cc src/compat.h src/compat_data.h src/native.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC $< $(LDFLAGS) -o $@
 src/install.o: src/embedded_resources.h
 src/embedded_resources.h: res/doc $(patsubst %/,%,$(NICKELHOOK))/embed_resources.py

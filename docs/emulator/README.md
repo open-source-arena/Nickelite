@@ -128,10 +128,11 @@ exercise Kobo's firmware updater, physical reboot or USB installation.
 The historical baseline visibly showed Nickel's Books page, the injected menu,
 a native message dialog, screenshots, reader dark-mode reversal and native
 navigation. Generated screenshots/logs/preferences and test EPUBs are excluded
-from publication. Their summary and the separate later guarded-cloud behavior
-are in [action compatibility](../action-compatibility-6.md). A freshly rebuilt
+from publication. Their summary and the later cloud panic report are in
+[action compatibility](../action-compatibility-6.md). A freshly rebuilt
 plugin has not automatically inherited those historical runtime results.
 
 Wi-Fi, RTC, framebuffer ioctls, e-ink updates, suspend, power and USB hardware are
-not modeled. The explicit offline sideloaded profile is intentionally denied by
-the final cloud guard. This setup cannot validate login, downloads or sync.
+not modeled. The Qt6 cloud actions are currently disabled after an owner-reported
+physical panic. This setup cannot validate login, downloads, sync or the panic
+containment on a Kobo reader.

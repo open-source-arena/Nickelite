@@ -64,7 +64,8 @@ The separate upstream draft PR240 reports basic on-device work on N367/5.18.2709
 https://github.com/pgaskin/NickelMenu/pull/240
 
 Exported symbol presence establishes resolvability, not class layout compatibility, action correctness, menu survival through USB transitions, or runtime installation safety. Private Settings/vtable assumptions, allocations of Nickel objects, event dispatch and GUI-thread rules need implementation checks; hardware behavior is outside this static analysis; see the separate
-[physical and simulator action results](action-compatibility-6.md).
+[physical and simulator action results](action-compatibility-6.md), including
+the later report of panics after cloud use and the current source containment.
 
 Independent bounded inspection supported the retained Settings and navigation
 storage sizes on 6.0.274403: observed Settings writes fit within 128 bytes, and
@@ -87,7 +88,7 @@ Baseline lead checks passed on 2026-10-26:
 
 Those acceptance checks describe the earlier baseline, whose package SHA256 was
 `9f4861e5e6dfe150dd65ed43539011797d10ad02166bd0d9310359d2c7f36cee`.
-The later guarded cloud candidate and physical results are recorded in
+The later Qt6 cloud bypass, panic report, and current containment are recorded in
 [action compatibility](action-compatibility-6.md). The stale local `dist/`
 baseline is excluded from publication. Rebuild from source using the README;
 embedded documentation, version strings and tar metadata can change hashes.

@@ -10,7 +10,11 @@ evidence directory and are safe to reuse.
 | Dropbox | [NickelMenuNG-Dropbox-20261026T141758Z.epub](NickelMenuNG-Dropbox-20261026T141758Z.epub) | `ad99300545aca8cb8458c4310eeac782d8112d8882b7957cc4726f6b0368b47e` |
 | Google Drive | [NickelMenuNG-GoogleDrive-20261026T141758Z.epub](NickelMenuNG-GoogleDrive-20261026T141758Z.epub) | `e5d898fda4b67543f8b0a7d5d30f42a6d49d2f46f07b8462357065893ce86768` |
 
-For each provider separately:
+These fixtures must not be used for a physical cloud test while the Qt6 actions
+are disabled after the reported panic. They are retained only for a future test
+after the native route is reviewed and re-enabled.
+
+For each provider separately, only after that re-enablement:
 
 1. Using your own provider session, upload only its matching EPUB to the existing
    Kobo app folder used by that provider's native integration. Keep the existing
