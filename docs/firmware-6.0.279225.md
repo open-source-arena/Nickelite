@@ -37,6 +37,13 @@ items and work on this firmware. A fresh Google Drive EPUB named
 `000-NickelMenuNG-6.0.279225-20261027.epub` downloaded and opened in My Books
 with its `PECAN` marker. Dropbox transfer on this firmware remains pending.
 
+A later Settings build was installed on the same N365. The built-in
+NickelMenu Settings popup opened, and its checkbox choices persisted between
+openings.
+Turning Dropbox off and saving showed the expected disabled message when its
+menu action was tapped; the Kobo stayed responsive. Dropbox was then turned
+back on.
+
 To recreate the guest, follow [real-cloud.md](emulator/real-cloud.md) with
 `NM_FIRMWARE_VERSION=6.0.279225`. Keep the work directory outside Git because
 its `onboard` subdirectory contains account tokens. The rebuilt VNC platform

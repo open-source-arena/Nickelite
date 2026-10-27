@@ -53,6 +53,11 @@ for a full-rootfs replacement.
 The built-in **NickelMenu Settings** popup controls the supported action groups
 above. All switches default to on. Save writes the hidden
 `.adds/nm/.features.ini` file on onboard storage; Cancel leaves it unchanged.
+The popup opened on the physical N365 running 6.0.279225, and checkbox
+choices persisted between openings. A disabled action has passed the 5.18
+simulator check. On the physical N365, turning Dropbox off blocked its menu
+action with the expected message and left the Kobo responsive; Dropbox was
+then turned back on.
 Turning a group off stops its NickelMenu action and displays a clear error,
 including inside a chain. It does not change Kobo's own feature settings or
 erase a provider link. Delete `.features.ini` to restore all defaults.
