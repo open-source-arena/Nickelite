@@ -150,7 +150,8 @@ Drive through the NickelMenu actions, and remained responsive. The syslog
 showed each native method return and each corresponding cloud view push, with
 no fatal signal. The Kobo EPUB fixture had already downloaded and opened in
 this guest through the stock cloud UI. A later physical N365 test also passed
-repeat entry, provider switching, and Google Drive EPUB download/open; see
+repeat entry, provider switching, and fresh EPUB download/open from both
+cloud providers; see
 [the compatibility report](../action-compatibility-6.md).
 
 ## Reuse or remove the guest

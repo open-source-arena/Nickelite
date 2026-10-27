@@ -16,10 +16,11 @@ development build. On a physical Clara BW (N365) running 6.0.274403, the
 `09f8dc6` cloud navigation build was installed through `.kobo/Kobo.tgz`, the
 archive was consumed, and Home remained responsive. Google Drive opened twice
 from Home; Google Drive → Dropbox → Google Drive navigation also worked without
-a panic. A known test EPUB downloaded from Google Drive and opened with its
-expected content marker. The prior `a46` candidate panicked on repeat Google
-Drive entry and was rolled back before this test. See [the compatibility
-results](docs/action-compatibility-6.md) for that history and remaining limits.
+a panic. Fresh test EPUBs downloaded from both Google Drive and Dropbox and
+opened with their expected content markers. The prior `a46` candidate panicked
+on repeat Google Drive entry and was rolled back before this test. See [the
+compatibility results](docs/action-compatibility-6.md) for that history and
+remaining limits.
 A successful build or symbol check does not establish compatibility with other
 6.x releases or devices.
 

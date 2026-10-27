@@ -21,9 +21,11 @@ between entries. Both file lists stayed responsive for about 30 seconds. From
 the Google Drive list, NickelMenu opened Dropbox, then returned to Google
 Drive; both lists stayed responsive. The previously uploaded Google Drive test
 EPUB downloaded and opened in My Books with the expected `WALNUT` marker.
+The fresh Dropbox test EPUB was uploaded to `Apps/Rakuten Kobo`, downloaded
+through NickelMenu → Dropbox, and opened with its unique `ACORN` marker.
 This verifies the previously failing repeat and provider-switch paths on this
-device and firmware. Dropbox transfer on this build, full library sync, and
-other Kobo models or firmware versions remain unverified.
+device and firmware, plus one file transfer from each provider. Full library
+sync and other Kobo models or firmware versions remain unverified.
 
 ## Earlier physical checkpoints
 
@@ -71,7 +73,7 @@ baseline.
 
 | Feature | Physical outcome | Remaining limit |
 |---|---|---|
-| Dropbox | **09f8dc6: PASS list/navigation.** Opened from Google Drive and remained responsive. The older 595 build passed a fixture download, then later panicked. | A Dropbox file download on 09f8dc6 and full sync remain unverified. |
+| Dropbox | **09f8dc6: PASS list/navigation and fresh EPUB download/open.** Opened from Google Drive and remained responsive; the new fixture showed its `ACORN` marker. | Full library sync and other firmware/device combinations remain unverified. |
 | Google Drive | **09f8dc6: PASS repeat entry, provider switching, and test EPUB download/open.** The prior a46 build panicked on repeat entry. | Longer use and other firmware/device combinations remain unverified. |
 | USB Connect | **PARTIAL.** Connect mounts the reader's storage. After safe eject and unplug, the stale Connected screen needs a short normal power press to restore the GUI. | Seamless disconnect recovery is not established; this is not a verified USB recovery fix. |
 
@@ -157,8 +159,8 @@ on the N365, then rolled back after repeat entry panicked. The native call had
 returned before those crashes. The controller is parented to the application,
 and source lookup reuses the same named child if it exists; logs do not prove
 which object was invalid. The delayed `09f8dc6` route passed repeat entry,
-provider switching, and a Google Drive fixture transfer/open on the physical
-N365. A Dropbox transfer on this build remains unverified.
+provider switching, and one fixture transfer/open from each cloud provider on
+the physical N365.
 
 Upstream [NickelMenu issue #143](https://github.com/pgaskin/NickelMenu/issues/143)
 contains separate reports of Google Drive remaining in a loading loop on Clara
