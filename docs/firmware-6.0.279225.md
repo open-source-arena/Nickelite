@@ -27,7 +27,12 @@ userspace guest showed NickelMenu on Home, opened linked Google Drive and
 Dropbox file lists, reopened Google Drive, and switched between providers
 without a panic. The guest reused account data stored outside Git. It does
 not emulate the physical touchscreen, USB hardware, updater, or power state.
-Physical cloud verification and a new-firmware file download remain pending.
+On the physical N365, the staged archive was applied after safe unmount and
+NickelMenu returned on Home. Google Drive opened twice from Home; Google Drive
+→ Dropbox → Google Drive switching also opened each linked file list and
+remained responsive for 30 seconds. A Google Drive swipe still opened the
+touched item instead of scrolling, matching the earlier firmware's list
+behavior. A new-firmware file download remains pending.
 
 To recreate the guest, follow [real-cloud.md](emulator/real-cloud.md) with
 `NM_FIRMWARE_VERSION=6.0.279225`. Keep the work directory outside Git because

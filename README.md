@@ -24,8 +24,9 @@ remaining limits.
 The 6.0.279225 full-rootfs update removed the NickelMenu plugin directory. A
 new build passed ARM tests and linked-account cloud-list entry, repeat entry,
 and provider switching in the QEMU userspace simulator; see the
-[6.0.279225 report](docs/firmware-6.0.279225.md). Physical cloud testing on
-that firmware is pending. A successful build or symbol check does not establish
+[6.0.279225 report](docs/firmware-6.0.279225.md). The physical N365 loaded
+NickelMenu after reinstall; repeat cloud entry and provider switching stayed
+responsive. A successful build or symbol check does not establish
 compatibility with other 6.x releases or devices.
 
 The repository contains source, the vendored NickelHook dependency, and local
