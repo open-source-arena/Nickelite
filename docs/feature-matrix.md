@@ -50,10 +50,10 @@ for a full-rootfs replacement.
 | Bluetooth actions | **Missing on Qt 6**; action returns an unsupported error. | Needs a new Qt 6 implementation and hardware checks. |
 | Pocket library and Reading Life awards routes | **Missing on Qt 6**; routes return an unsupported error. | Firmware no longer exposes the old routes; Settings cannot enable them. |
 
-The built-in **NickelMenu Settings** popup controls the supported action groups
+The built-in **NickelMenu Settings** full-screen view controls the supported action groups
 above. All switches default to on. Save writes the hidden
-`.adds/nm/.features.ini` file on onboard storage; Cancel leaves it unchanged.
-The popup opened on the physical N365 running 6.0.279225, and checkbox
+`.adds/nm/.features.ini` file on onboard storage; Back leaves it unchanged.
+The earlier popup opened on the physical N365 running 6.0.279225, and checkbox
 choices persisted between openings. A disabled action has passed the 5.18
 simulator check. On the physical N365, turning Dropbox off blocked its menu
 action with the expected message and left the Kobo responsive; Dropbox was
@@ -62,5 +62,29 @@ Turning a group off stops its NickelMenu action and displays a clear error,
 including inside a chain. It does not change Kobo's own feature settings or
 erase a provider link. Delete `.features.ini` to restore all defaults.
 Debug actions, chaining and uninstall remain available so a bad choice cannot
-lock the recovery path. This popup does not turn missing Qt 6 actions into
+lock the recovery path. This view does not turn missing Qt 6 actions into
 working actions.
+
+The **Menu items** tab reads the same `.adds/nm` files as NickelMenu. It shows
+hand-written `menu_item` entries and writes changes back to their source file;
+new entries go to `zz-nm-settings.conf`. It validates the entire config before
+and after saving and refuses to overwrite a file changed while the view was
+open. Editing a first action leaves its `chain_*` lines intact; removing the
+item removes those chained actions. The 5.18 simulator verified adding and
+running a new action, seeing a hand-edited label in both the menu and Settings,
+and removing a chained item without a parse error. These UI edits have not yet
+been tried on the physical N365. The 6.0.279225 simulator also opened the
+two-tab editor and displayed it on a fresh, empty configuration. A later
+native full-screen Settings view passed on the 6.0.279225 simulator: the
+NickelMenu navigation tab was active, Kobo's Back button returned to the
+previous tab, Kobo's keyboard entered text, and the native menu selector saved
+`reader` to the config file. The view still awaits a physical touchscreen check.
+
+## Feasibility of the remaining old features
+
+| Feature | Practical path on Qt 6 |
+|---|---|
+| Bluetooth controls | Plausible on Kobo models with Bluetooth hardware. The 6.0.279225 library exports `BluetoothManager::sharedInstance`, `up`, `scan`, and `stopScan`, but the old on/off entry points are absent. A new implementation needs the current power-control API and physical hardware checks. |
+| Nickel Extras games and sketch pad | The old `ExtrasPluginLoader::loadPlugin` entry point is absent from 6.0.279225. Launching a separately maintained app is possible; restoring the old built-in games would require replacement UI and game code. |
+| Pocket library | The old Pocket route is absent. The existing Instapaper route covers the supported article-library use case, but it is a different service. Restoring Pocket itself would require an independent integration. |
+| Reading Life awards | The old route is absent. A new awards view could be built from available reading data, but it would be a new feature rather than re-enabling the old firmware screen. |

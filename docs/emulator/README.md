@@ -82,6 +82,18 @@ This emulator-only plugin does not belong in the production `Kobo.tgz` archive.
 
 ## Firmware 5.18 settings check (2026-10-27)
 
+The later menu-editor candidate was also exercised on this guest. An action
+added in Settings appeared in NickelMenu and ran. A hand edit to its config
+line appeared in both the menu and Settings after reopening. Removing that
+item in Settings removed its config line. A separate item with a `chain_success`
+line was removed in Settings; its chain line was removed while nearby comments
+remained, and the menu kept working. The same candidate's two-tab Settings
+view opened on the 6.0.279225 sideloaded-mode guest. A later full-screen view
+used Kobo's Back button, native keyboard and menu selectors; the 6.0 guest
+saved a `reader` menu item with keyboard-entered text to its config file.
+The same native view and selector opened on the 5.18 simulator. These editor
+checks are simulator results, not physical touchscreen checks.
+
 The 5.18.270971 Kobo firmware image booted with the same Qt 6 `Kobo.tgz`
 build. On a fresh, sideloaded-mode onboard directory, the NickelMenu tab and
 Settings popup appeared. Saving **Dark mode** off wrote

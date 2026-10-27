@@ -44,6 +44,17 @@ Turning Dropbox off and saving showed the expected disabled message when its
 menu action was tapped; the Kobo stayed responsive. Dropbox was then turned
 back on.
 
+The later menu-editor candidate (`Kobo.tgz` SHA-256
+`f1b0c9821528d3244fbd1304f97ac2783936da4d816ae83e6255000b9b5140ff`)
+was installed on the same N365 after a private backup of `.adds/nm`. Its
+Features and Menu items tabs opened, and the Kobo remained responsive. Its
+generic Qt fields did not invoke Kobo's soft keyboard on physical hardware.
+A revised full-screen native view passed both simulator checks and awaits
+physical installation and touchscreen verification.
+The revised package (`Kobo.tgz` SHA-256
+`13bbde21709c1de2c6f33ab670d35573e1224670f9d1e0c602c719ae3fde9de9`)
+was verified on N365 storage and safely unmounted for the physical check.
+
 To recreate the guest, follow [real-cloud.md](emulator/real-cloud.md) with
 `NM_FIRMWARE_VERSION=6.0.279225`. Keep the work directory outside Git because
 its `onboard` subdirectory contains account tokens. The rebuilt VNC platform

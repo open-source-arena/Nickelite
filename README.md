@@ -66,7 +66,15 @@ See [the configuration documentation](res/doc) to add menu entries. Errors are
 shown in the menu when possible; startup errors appear in `logread` over SSH.
 The built-in **NickelMenu Settings** item controls supported action groups on
 Qt 6. Its switches default to on and are saved in `.adds/nm/.features.ini`;
-deleting that hidden file restores defaults. See the
+deleting that hidden file restores defaults. Its **Menu items** tab reads the
+existing `.adds/nm` files. You can add, edit or remove a menu item there;
+changes made in a text editor appear when you reopen Settings. New items go
+to `zz-nm-settings.conf`. Editing an item keeps its chained actions, while
+removing it removes the chain. Save validates the resulting config and rejects
+files changed while the Settings view was open. The full-screen view uses Kobo's
+Back button to leave without saving and highlights the NickelMenu tab while
+open. Its text fields use Kobo's on-screen keyboard. Back up `.adds/nm` before
+substantial edits. See the
 [v0.6.0 feature matrix](docs/feature-matrix.md) for coverage and limits.
 
 Extras, Bluetooth controls, Pocket and reading awards are unavailable in this

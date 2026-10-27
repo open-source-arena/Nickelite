@@ -27,6 +27,10 @@
 # one of the the following formats (spaces around fields are ignored):
 #
 #   menu_item:<location>:<label>:<action>:<arg>
+# On Qt 6, NickelMenu Settings > Menu items can add, edit and remove these
+# lines in the existing config files. Reopen Settings after a manual edit to
+# see it there. New on-device items go to zz-nm-settings.conf. Editing keeps
+# following chain_* lines; removing an item removes its following chain_* lines.
 #     Adds a menu item.
 #
 #     <location>  the menu to add the item to, one of:

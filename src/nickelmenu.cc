@@ -17,12 +17,25 @@
 #include <QWidgetAction>
 #if NM_QT_MAJOR >= 6
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QFileInfo>
+#include <QFrame>
+#include <QFormLayout>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QList>
+#include <QListWidget>
+#include <QMap>
+#include <QPointer>
+#include <QSaveFile>
+#include <QScreen>
 #include <QScrollArea>
 #include <QSettings>
+#include <QTabWidget>
 #include <QTimer>
 #include <QVBoxLayout>
 #endif
@@ -103,36 +116,384 @@ static const char *nm_feature_label(const char *key) {
     return key;
 }
 
+static const QString nm_ui_items_path = QLatin1String(NM_CONFIG_DIR "/zz-nm-settings.conf");
+
+static bool nm_config_valid() {
+    nm_config_file_t *files = nm_config_files();
+    if (nm_err_peek()) return false;
+    nm_config_t *config = nm_config_parse(files);
+    nm_config_files_free(files);
+    if (!config) return false;
+    nm_config_free(config);
+    return true;
+}
+
+static QStringList nm_menu_fields(const QString &line) {
+    const QString trimmed = line.trimmed();
+    if (!trimmed.startsWith(QLatin1String("menu_item:"))) return {};
+    const int p1 = trimmed.indexOf(':', 10), p2 = trimmed.indexOf(':', p1 + 1), p3 = trimmed.indexOf(':', p2 + 1);
+    if (p1 < 0 || p2 < 0 || p3 < 0) return {};
+    return {trimmed.mid(10, p1 - 10).trimmed(), trimmed.mid(p1 + 1, p2 - p1 - 1).trimmed(),
+            trimmed.mid(p2 + 1, p3 - p2 - 1).trimmed(), trimmed.mid(p3 + 1).trimmed()};
+}
+
+static bool nm_read_ui_items(QListWidget *list, QMap<QString, QByteArray> *snapshots) {
+    if (!nm_config_valid()) return false;
+    const QDir dir(QLatin1String(NM_CONFIG_DIR));
+    for (const QFileInfo &info : dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name)) {
+        const QString name = info.fileName();
+        if (info.isSymLink() || name.endsWith('~') || name == QLatin1String("desktop.ini")
+            || name.compare(QLatin1String("Thumbs.db"), Qt::CaseInsensitive) == 0
+            || name.endsWith(QLatin1String(".swp")) || name.endsWith(QLatin1String(".swo"))) continue;
+        QFile file(info.filePath());
+        if (!file.open(QIODevice::ReadOnly)) return false;
+        const QByteArray data = file.readAll();
+        snapshots->insert(info.filePath(), data);
+        const QStringList lines = QString::fromUtf8(data).split('\n');
+        for (int i = 0; i < lines.size(); ++i) {
+            const QStringList parsed = nm_menu_fields(lines[i]);
+            if (parsed.isEmpty()) continue;
+            const QStringList fields{info.filePath(), QString::number(i), parsed[0], parsed[1], parsed[2], parsed[3]};
+            auto *item = new QListWidgetItem(fields[3] + QLatin1String(" / ") + fields[2]
+                                             + QLatin1String(" / ") + info.fileName(), list);
+            item->setData(Qt::UserRole, fields);
+        }
+    }
+    return true;
+}
+
+static bool nm_write_file(const QString &path, const QByteArray &data) {
+    QSaveFile file(path);
+    return file.open(QIODevice::WriteOnly) && file.write(data) == data.size() && file.commit();
+}
+
+static bool nm_write_ui_items(QListWidget *list, const QMap<QString, QByteArray> &snapshots) {
+    QMap<QString, QByteArray> changed;
+    for (auto it = snapshots.cbegin(); it != snapshots.cend(); ++it) {
+        QFile current(it.key());
+        if (!current.open(QIODevice::ReadOnly) || current.readAll() != it.value()) return false;
+        QStringList lines = QString::fromUtf8(it.value()).split('\n');
+        bool dropChains = false;
+        bool dirty = false;
+        for (int line = 0; line < lines.size(); ++line) {
+            const QStringList old = nm_menu_fields(lines[line]);
+            if (!old.isEmpty()) {
+                dropChains = false;
+                QListWidgetItem *matching = nullptr;
+                for (int n = 0; n < list->count(); ++n) {
+                    const QStringList fields = list->item(n)->data(Qt::UserRole).toStringList();
+                    if (fields[0] == it.key() && fields[1].toInt() == line) { matching = list->item(n); break; }
+                }
+                if (!matching) { lines[line].clear(); dropChains = true; dirty = true; }
+                else {
+                    const QStringList fields = matching->data(Qt::UserRole).toStringList();
+                    if (fields.mid(2) != old) {
+                        lines[line] = QLatin1String("menu_item:") + fields.mid(2).join(':');
+                        dirty = true;
+                    }
+                }
+            } else if (dropChains && lines[line].trimmed().startsWith(QLatin1String("chain_"))) {
+                lines[line].clear(); dirty = true;
+            } else if (!lines[line].trimmed().isEmpty() && !lines[line].trimmed().startsWith('#')) {
+                dropChains = false;
+            }
+        }
+        if (dirty) changed.insert(it.key(), lines.join('\n').toUtf8());
+    }
+    QByteArray added;
+    for (int n = 0; n < list->count(); ++n) {
+        const QStringList fields = list->item(n)->data(Qt::UserRole).toStringList();
+        if (fields[1] == QLatin1String("-1"))
+            added += (QLatin1String("menu_item:") + fields.mid(2).join(':') + QLatin1Char('\n')).toUtf8();
+    }
+    if (!added.isEmpty()) {
+        QByteArray base = changed.value(nm_ui_items_path, snapshots.value(nm_ui_items_path));
+        if (!base.isEmpty() && !base.endsWith('\n')) base += '\n';
+        changed.insert(nm_ui_items_path, base + added);
+    }
+    for (auto it = changed.cbegin(); it != changed.cend(); ++it)
+        if (QFile::exists(it.key()) && !snapshots.contains(it.key())) return false;
+    QStringList written;
+    for (auto it = changed.cbegin(); it != changed.cend(); ++it) {
+        if (!nm_write_file(it.key(), it.value())) break;
+        written << it.key();
+    }
+    if (written.size() == changed.size() && nm_config_valid()) return true;
+    for (const QString &path : written) {
+        if (snapshots.contains(path)) nm_write_file(path, snapshots[path]);
+        else QFile::remove(path);
+    }
+    return false;
+}
+
+static QWidget *nm_native_view(const QString &title) {
+    using NativeDialog = QWidget;
+    auto ctor = reinterpret_cast<void (*)(NativeDialog *, QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN8N3DialogC2EP7QWidgetb"));
+    auto setTitle = reinterpret_cast<void (*)(NativeDialog *, const QString &)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog8setTitleERK7QString"));
+    auto fullView = reinterpret_cast<void (*)(NativeDialog *)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog18enableFullViewModeEv"));
+    auto backButton = reinterpret_cast<void (*)(NativeDialog *, bool)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog16enableBackButtonEb"));
+    auto disableClose = reinterpret_cast<void (*)(NativeDialog *)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog18disableCloseButtonEv"));
+    auto setContent = dlsym(RTLD_DEFAULT, "_ZN8N3Dialog10setContentEP7QWidget");
+    if (!ctor || !setTitle || !fullView || !backButton || !disableClose || !setContent || !nh_native_type("N3Dialog").isValid()) return nullptr;
+    auto *view = reinterpret_cast<NativeDialog *>(nm_native_storage("N3Dialog", 0));
+    if (!view) return nullptr;
+    ctor(view, nullptr, false);
+    setTitle(view, title);
+    fullView(view);
+    backButton(view, true);
+    disableClose(view);
+    view->setAttribute(Qt::WA_DeleteOnClose);
+    view->resize(QGuiApplication::primaryScreen()->availableGeometry().size() * 0.9);
+    auto *shim = new QPushButton(view);
+    shim->hide();
+    if (QObject::connect(view, SIGNAL(backTapped()), shim, SIGNAL(pressed())))
+        QObject::connect(shim, &QPushButton::pressed, view, [view] { view->close(); });
+    return view;
+}
+
+static void nm_native_set_content(QWidget *view, QWidget *content) {
+    auto setContent = reinterpret_cast<void (*)(QWidget *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog10setContentEP7QWidget"));
+    setContent(view, content);
+}
+
+static QCheckBox *nm_native_checkbox(QWidget *parent, const QString &text) {
+    auto ctor = reinterpret_cast<void (*)(QCheckBox *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN13TouchCheckBoxC2EP7QWidget"));
+    if (!ctor || !nh_native_type("TouchCheckBox").isValid()) return new QCheckBox(text, parent);
+    auto *box = reinterpret_cast<QCheckBox *>(nm_native_storage("TouchCheckBox", 0));
+    if (!box) return new QCheckBox(text, parent);
+    ctor(box, parent);
+    box->setText(text);
+    return box;
+}
+
+static QLineEdit *nm_native_line(QWidget *parent) {
+    auto ctor = reinterpret_cast<void (*)(QLineEdit *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN13TouchLineEditC2EP7QWidget"));
+    if (!ctor || !nh_native_type("TouchLineEdit").isValid()) return new QLineEdit(parent);
+    auto *line = reinterpret_cast<QLineEdit *>(nm_native_storage("TouchLineEdit", 0));
+    if (!line) return new QLineEdit(parent);
+    ctor(line, parent);
+    return line;
+}
+
+struct nm_choice {
+    QWidget *widget;
+    QStringList items;
+    bool native;
+    QString currentText() const {
+        if (!native) return static_cast<QComboBox *>(widget)->currentText();
+        auto currentIndex = reinterpret_cast<int (*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZNK13TouchDropDown12currentIndexEv"));
+        return items.value(currentIndex(widget));
+    }
+};
+
+static nm_choice nm_native_choice(QWidget *parent, QStringList items, const QString &selected) {
+    auto ctor = reinterpret_cast<void (*)(QWidget *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN13TouchDropDownC2EP7QWidget"));
+    auto addItem = reinterpret_cast<void (*)(QWidget *, const QString &, const QVariant &, const QLocale &, bool)>(dlsym(RTLD_DEFAULT, "_ZN24MultiSelectTouchDropDown7addItemERK7QStringRK8QVariantRK7QLocaleb"));
+    auto setCurrentIndex = reinterpret_cast<void (*)(QWidget *, int)>(dlsym(RTLD_DEFAULT, "_ZN13TouchDropDown15setCurrentIndexEi"));
+    auto currentIndex = dlsym(RTLD_DEFAULT, "_ZNK13TouchDropDown12currentIndexEv");
+    if (!ctor || !addItem || !setCurrentIndex || !currentIndex || !nh_native_type("TouchDropDown").isValid()) {
+        auto *combo = new QComboBox(parent);
+        combo->addItems(items);
+        combo->setCurrentText(selected);
+        return {combo, items, false};
+    }
+    auto *choice = reinterpret_cast<QWidget *>(nm_native_storage("TouchDropDown", 0));
+    if (!choice) {
+        auto *combo = new QComboBox(parent);
+        combo->addItems(items);
+        combo->setCurrentText(selected);
+        return {combo, items, false};
+    }
+    ctor(choice, parent);
+    for (const QString &text : items) addItem(choice, text, QVariant(text), QLocale(), false);
+    setCurrentIndex(choice, qMax(0, items.indexOf(selected)));
+    return {choice, items, true};
+}
+
+static void nm_native_keyboard(QWidget *view, const QList<QLineEdit *> &lines) {
+    auto *frame = view->findChild<QWidget *>(QStringLiteral("keyboardFrame"));
+    auto createKeyboard = reinterpret_cast<void *(*)(QWidget *, int, const QLocale &)>(dlsym(RTLD_DEFAULT, "_ZN13KeyboardFrame14createKeyboardE14KeyboardScriptRK7QLocale"));
+    auto receiverCtor = reinterpret_cast<void (*)(QObject *, QLineEdit *, bool)>(dlsym(RTLD_DEFAULT, "_ZN16KeyboardReceiverC2EP9QLineEditb"));
+    auto setReceiver = reinterpret_cast<void (*)(void *, QObject *, bool)>(dlsym(RTLD_DEFAULT, "_ZN24SearchKeyboardController11setReceiverEP16KeyboardReceiverb"));
+    auto showKeyboard = reinterpret_cast<void (*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog12showKeyboardEv"));
+    if (!frame || !createKeyboard || !receiverCtor || !setReceiver || !showKeyboard || !nh_native_type("KeyboardReceiver").isValid()) return;
+    void *controller = createKeyboard(frame, 0, QLocale());
+    if (!controller) return;
+    for (QLineEdit *line : lines) {
+        auto *receiver = reinterpret_cast<QObject *>(nm_native_storage("KeyboardReceiver", 0));
+        if (!receiver) continue;
+        receiverCtor(receiver, line, false);
+        receiver->setParent(view);
+        auto *shim = new QPushButton(view);
+        shim->hide();
+        if (QObject::connect(line, SIGNAL(tapped()), shim, SIGNAL(pressed())))
+            QObject::connect(shim, &QPushButton::pressed, view, [view, line, receiver, controller, setReceiver, showKeyboard] {
+                setReceiver(controller, receiver, true);
+                line->setFocus();
+                showKeyboard(view);
+            });
+    }
+}
+
+static void nm_native_style_button(QPushButton *button) {
+    button->setMinimumHeight(64);
+    QFont font = button->font();
+    font.setPixelSize(30);
+    button->setFont(font);
+    button->setStyleSheet(QStringLiteral("QPushButton { background: #dedede; border: 0; padding: 10px 18px; } QPushButton:pressed { background: black; color: white; }"));
+}
+
+static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing) {
+    QWidget *editor = nm_native_view(existing ? QStringLiteral("Edit menu item") : QStringLiteral("Add menu item"));
+    if (!editor) {
+        nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Kobo's native editor is unavailable on this firmware."));
+        return;
+    }
+    auto *content = new QWidget(editor);
+    QFont uiFont = content->font();
+    uiFont.setPixelSize(28);
+    content->setFont(uiFont);
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(22, 16, 22, 18);
+    layout->setSpacing(20);
+    auto *form = new QFormLayout;
+    form->setSpacing(18);
+    const QStringList oldFields = existing ? existing->data(Qt::UserRole).toStringList() : QStringList{};
+    auto location = nm_native_choice(content,
+        {QStringLiteral("main"), QStringLiteral("reader"), QStringLiteral("browser"),
+         QStringLiteral("library"), QStringLiteral("selection"), QStringLiteral("selection_search")},
+        existing ? oldFields[2] : QStringLiteral("main"));
+    auto *label = nm_native_line(content);
+    QStringList actions;
+#define X(name, qt5, qt6) if (qt6) actions << QStringLiteral(#name);
+    NM_ACTIONS
+#undef X
+    if (existing && !actions.contains(oldFields[4])) actions << oldFields[4];
+    auto action = nm_native_choice(content, actions, existing ? oldFields[4] : QStringLiteral("dbg_msg"));
+    auto *argument = nm_native_line(content);
+    argument->setPlaceholderText(QStringLiteral("Optional action argument"));
+    if (existing) {
+        label->setText(oldFields[3]);
+        argument->setText(oldFields[5]);
+    }
+    for (auto *widget : {location.widget, static_cast<QWidget *>(label),
+                         action.widget, static_cast<QWidget *>(argument)}) {
+        widget->setMinimumHeight(64);
+        widget->setFont(uiFont);
+    }
+    form->addRow(QStringLiteral("Menu"), location.widget);
+    form->addRow(QStringLiteral("Label"), label);
+    form->addRow(QStringLiteral("Action"), action.widget);
+    form->addRow(QStringLiteral("Argument"), argument);
+    for (auto *widget : {location.widget, static_cast<QWidget *>(label),
+                         action.widget, static_cast<QWidget *>(argument)})
+        if (auto *caption = form->labelForField(widget)) caption->setFont(uiFont);
+    layout->addLayout(form);
+    layout->addStretch();
+    auto *save = new QPushButton(QStringLiteral("Save item"), content);
+    nm_native_style_button(save);
+    layout->addWidget(save);
+    nm_native_set_content(editor, content);
+    QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, location, label, action, argument] {
+        if (label->text().trimmed().isEmpty() || label->text().contains(':') || label->text().contains('\n')
+            || label->text().contains('\r') || argument->text().contains('\n') || argument->text().contains('\r')) {
+            nm_show_dialog(QStringLiteral("Menu item"), QStringLiteral("Enter a label without colons or line breaks, and a one-line argument."));
+            return;
+        }
+        const QStringList previous = existing ? existing->data(Qt::UserRole).toStringList()
+                                              : QStringList{nm_ui_items_path, QStringLiteral("-1")};
+        const QStringList fields{previous[0], previous[1], location.currentText(), label->text().trimmed(), action.currentText(), argument->text()};
+        auto *item = existing ? existing : new QListWidgetItem(list);
+        item->setData(Qt::UserRole, fields);
+        item->setText(fields[3] + QLatin1String(" / ") + fields[2] + QLatin1String(" / ") + QFileInfo(fields[0]).fileName());
+        editor->close();
+    });
+    editor->show();
+    nm_native_keyboard(editor, {label, argument});
+    auto hideKeyboard = reinterpret_cast<void (*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog12hideKeyboardEv"));
+    if (hideKeyboard) hideKeyboard(editor);
+}
+
 static void nm_show_feature_settings() {
-    auto *dialog = new QDialog(nullptr);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QStringLiteral("NickelMenu Settings"));
-    dialog->resize(760, 1050);
-    auto *layout = new QVBoxLayout(dialog);
-    auto *title = new QLabel(QStringLiteral("NickelMenu Settings"), dialog);
-    title->setStyleSheet(QStringLiteral("font-size: 30px; font-weight: bold;"));
-    layout->addWidget(title);
-    auto *scroll = new QScrollArea(dialog);
+    QWidget *view = nm_native_view(QStringLiteral("NickelMenu Settings"));
+    if (!view) {
+        nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Kobo's native settings view is unavailable on this firmware."));
+        return;
+    }
+    auto *content = new QWidget(view);
+    QFont uiFont = content->font();
+    uiFont.setPixelSize(28);
+    content->setFont(uiFont);
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(22, 8, 22, 18);
+    layout->setSpacing(14);
+    auto *tabs = new QTabWidget(content);
+    tabs->setStyleSheet(QStringLiteral(
+        "QTabWidget::pane { border: 0; border-top: 1px solid #aaa; }"
+        "QTabBar::tab { border: 0; background: white; min-height: 58px; min-width: 180px; padding: 4px 12px; font-size: 25px; }"
+        "QTabBar::tab:selected { border-bottom: 4px solid black; font-weight: bold; }"
+        "QListWidget { border: 0; font-size: 30px; } QListWidget::item { min-height: 64px; }"));
+    layout->addWidget(tabs);
+    auto *scroll = new QScrollArea(tabs);
+    scroll->setFrameShape(QFrame::NoFrame);
     scroll->setWidgetResizable(true);
-    auto *list = new QWidget(scroll);
-    auto *rows = new QVBoxLayout(list);
+    auto *featureList = new QWidget(scroll);
+    auto *rows = new QVBoxLayout(featureList);
+    rows->setSpacing(8);
     QList<QCheckBox *> boxes;
     for (const auto &feature : nm_features) {
-        auto *box = new QCheckBox(QLatin1String(feature.label), list);
+        auto *box = nm_native_checkbox(featureList, QLatin1String(feature.label));
         box->setChecked(nm_feature_enabled(feature.key));
-        box->setMinimumHeight(62);
-        box->setStyleSheet(QStringLiteral("QCheckBox { font-size: 24px; spacing: 20px; } QCheckBox::indicator { width: 36px; height: 36px; }"));
+        box->setMinimumHeight(70);
+        QFont font = box->font();
+        font.setPixelSize(26);
+        box->setFont(font);
         rows->addWidget(box);
         boxes.append(box);
     }
     rows->addStretch();
-    scroll->setWidget(list);
-    layout->addWidget(scroll);
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, dialog);
-    for (auto *button : buttons->findChildren<QPushButton *>()) button->setMinimumHeight(68);
-    layout->addWidget(buttons);
-    QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
-    QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [dialog, boxes] {
+    scroll->setWidget(featureList);
+    tabs->addTab(scroll, QStringLiteral("Features"));
+    auto *menuPage = new QWidget(tabs);
+    auto *menuLayout = new QVBoxLayout(menuPage);
+    auto *hint = new QLabel(QStringLiteral("Menu items in .adds/nm. Changes are written to the same files when you save."), menuPage);
+    hint->setWordWrap(true);
+    hint->setFont(uiFont);
+    menuLayout->addWidget(hint);
+    auto *menuItems = new QListWidget(menuPage);
+    menuItems->setFont(uiFont);
+    menuItems->setSpacing(8);
+    menuLayout->addWidget(menuItems);
+    auto snapshots = QMap<QString, QByteArray>{};
+    const bool editable = nm_read_ui_items(menuItems, &snapshots);
+    auto *menuButtons = new QHBoxLayout;
+    auto *add = new QPushButton(QStringLiteral("Add"), menuPage);
+    auto *edit = new QPushButton(QStringLiteral("Edit"), menuPage);
+    auto *remove = new QPushButton(QStringLiteral("Remove"), menuPage);
+    for (auto *button : {add, edit, remove}) {
+        nm_native_style_button(button);
+        button->setEnabled(editable);
+        menuButtons->addWidget(button);
+    }
+    menuLayout->addLayout(menuButtons);
+    tabs->addTab(menuPage, QStringLiteral("Menu items"));
+    QObject::connect(add, &QPushButton::clicked, view, [menuItems] { nm_edit_ui_item(menuItems, nullptr); });
+    QObject::connect(edit, &QPushButton::clicked, view, [menuItems] {
+        if (auto *item = menuItems->currentItem()) nm_edit_ui_item(menuItems, item);
+    });
+    QObject::connect(remove, &QPushButton::clicked, view, [menuItems] {
+        delete menuItems->takeItem(menuItems->currentRow());
+    });
+    if (!editable) nm_show_dialog(QStringLiteral("Menu items"), QStringLiteral("A config file could not be read or validated. Menu items are protected from changes."));
+    auto *save = new QPushButton(QStringLiteral("Save settings"), content);
+    nm_native_style_button(save);
+    layout->addWidget(save);
+    nm_native_set_content(view, content);
+    QObject::connect(save, &QPushButton::clicked, view, [view, boxes, menuItems, editable, snapshots] {
+        if (editable && !nm_write_ui_items(menuItems, snapshots)) {
+            nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save menu items."));
+            return;
+        }
         QSettings settings(QLatin1String(NM_CONFIG_DIR "/.features.ini"), QSettings::IniFormat);
         for (qsizetype i = 0; i < boxes.size(); ++i)
             settings.setValue(QLatin1String(nm_features[i].key), boxes[i]->isChecked());
@@ -141,10 +502,31 @@ static void nm_show_feature_settings() {
             nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save feature settings."));
             return;
         }
-        dialog->accept();
+        view->close();
     });
-    dialog->open();
+    auto getActive = reinterpret_cast<QWidget *(*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN11MainNavView18getActiveNavButtonEv"));
+    auto setActive = reinterpret_cast<void (*)(QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN13MainNavButton9setActiveEb"));
+    if (getActive && setActive) {
+        QWidget *nav = nullptr;
+        QWidget *menuTab = nullptr;
+        for (QWidget *widget : QApplication::allWidgets()) {
+            if (widget->inherits("MainNavView")) nav = widget;
+            if (widget->objectName() == QLatin1String("nmButton")) menuTab = widget;
+        }
+        if (nav && menuTab) {
+            QPointer<QWidget> previous = getActive(nav);
+            QPointer<QWidget> tab = menuTab;
+            if (previous && previous != tab) setActive(previous, false);
+            setActive(menuTab, true);
+            QObject::connect(view, &QObject::destroyed, [previous, tab, setActive] {
+                if (tab) setActive(tab, false);
+                if (previous) setActive(previous, true);
+            });
+        }
+    }
+    view->show();
 }
+
 #endif
 
 typedef QWidget MenuTextItem; // it's actually a subclass, but we don't need its functionality directly, so we'll stay on the safe side
