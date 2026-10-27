@@ -65,6 +65,8 @@ void nm_config_free(nm_config_t *cfg);
 // will be incremented and returned (even if there was an error). On error,
 // nm_err is set, and otherwise, it is cleared.
 int nm_global_config_update();
+// Reload after writing onboard config, even if its filesystem timestamp did not change.
+int nm_global_config_reload();
 
 // nm_global_config_items returns an array of pointers with the current menu
 // items (the pointer and the items it points to will remain valid until the

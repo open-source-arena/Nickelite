@@ -70,10 +70,13 @@ deleting that hidden file restores defaults. Its **Menu items** tab reads the
 existing `.adds/nm` files. You can add, edit or remove a menu item there;
 changes made in a text editor appear when you reopen Settings. New items go
 to `zz-nm-settings.conf`. Editing an item keeps its chained actions, while
-removing it removes the chain. Save validates the resulting config and rejects
-files changed while the Settings view was open. The full-screen view uses Kobo's
-Back button to leave without saving and highlights the NickelMenu tab while
-open. Its text fields use Kobo's on-screen keyboard. Back up `.adds/nm` before
+removing it removes the chain. **Apply changes** validates and writes the config,
+then refreshes NickelMenu immediately; no reboot is needed. It rejects files
+changed while the Settings view was open. The view fills the page above Kobo's
+bottom navigation, shows readable menu and action names, and highlights the
+NickelMenu tab while open. Back or another bottom tab asks before discarding
+unsaved changes, including changes in the item editor. Its text fields use
+Kobo's on-screen keyboard. Back up `.adds/nm` before
 substantial edits. See the
 [v0.6.0 feature matrix](docs/feature-matrix.md) for coverage and limits.
 

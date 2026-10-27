@@ -31,6 +31,8 @@
 # lines in the existing config files. Reopen Settings after a manual edit to
 # see it there. New on-device items go to zz-nm-settings.conf. Editing keeps
 # following chain_* lines; removing an item removes its following chain_* lines.
+# Tap Apply changes to write edits and refresh the menus without rebooting.
+# Back or another bottom tab asks before discarding unsaved Settings edits.
 #     Adds a menu item.
 #
 #     <location>  the menu to add the item to, one of:

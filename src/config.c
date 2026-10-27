@@ -976,3 +976,9 @@ int nm_global_config_update() {
     nm_err_set(NULL);
     return nm_global_menu_config_rev;
 }
+
+int nm_global_config_reload() {
+    nm_config_files_free(nm_global_menu_config_files);
+    nm_global_menu_config_files = NULL;
+    return nm_global_config_update();
+}

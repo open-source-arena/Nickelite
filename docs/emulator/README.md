@@ -94,6 +94,14 @@ saved a `reader` menu item with keyboard-entered text to its config file.
 The same native view and selector opened on the 5.18 simulator. These editor
 checks are simulator results, not physical touchscreen checks.
 
+The revised view filled the area above the bottom navigation in both firmware
+guests. In the 6.0 guest, an edited menu item appeared immediately after Apply
+changes. A clean tab switch closed both the item editor and Settings. An
+unsaved edit in the child editor or a changed feature switch in Settings showed
+the native Discard changes confirmation on a tab switch. The 5.18 guest also
+showed that confirmation. Human-readable menu and action names appeared in the
+native selectors, with the original keys retained in config files.
+
 The 5.18.270971 Kobo firmware image booted with the same Qt 6 `Kobo.tgz`
 build. On a fresh, sideloaded-mode onboard directory, the NickelMenu tab and
 Settings popup appeared. Saving **Dark mode** off wrote

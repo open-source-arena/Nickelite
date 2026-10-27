@@ -54,6 +54,29 @@ physical installation and touchscreen verification.
 The revised package (`Kobo.tgz` SHA-256
 `13bbde21709c1de2c6f33ab670d35573e1224670f9d1e0c602c719ae3fde9de9`)
 was verified on N365 storage and safely unmounted for the physical check.
+The user confirmed its two tabs and menu editor work on the N365, then reported
+that the content did not fill the page, button layout and raw action names were
+hard to use, and saved menu changes were not visible immediately.
+
+The follow-up Settings UX package (`Kobo.tgz` SHA-256
+`b3210fb0066dd095bbdc395884c62de44bd7ad8f799e5681192dfd0576e513fc`)
+fills the area above Kobo's bottom tabs, aligns the editor buttons, labels menu
+locations and actions in plain language, and forces the menu to reload after
+Apply changes. Back or another tab asks before discarding unsaved changes,
+including in the item editor. These behaviors passed in 5.18.270971 and
+6.0.279225 simulator guests. The package was copied to the N365 after backing
+up `.adds/nm` to `/tmp/nm-n365-before-settings-ux-20261027.tar.gz`; the copy's
+checksum matched and Kobo storage was safely unmounted. The user confirmed on
+the physical N365 that the view filled the page, readable choices appeared,
+and the Kobo remained responsive. They also spotted focus outlines, a brown
+selection color in the simulator, and a small width mismatch in the editor.
+
+The visual follow-up (`Kobo.tgz` SHA-256
+`f638c428fbd5e90bdad311b56f15984383a3c72f47ace8213d65a3ed305c3903`)
+removes focus from touch-only controls, uses a gray selected row with a black
+underline, and aligns the editing controls with Apply changes. The revision
+passed visual checks in both simulator guests and awaits a physical touchscreen
+check.
 
 To recreate the guest, follow [real-cloud.md](emulator/real-cloud.md) with
 `NM_FIRMWARE_VERSION=6.0.279225`. Keep the work directory outside Git because

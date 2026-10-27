@@ -21,6 +21,7 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QEvent>
 #include <QFileInfo>
 #include <QFrame>
 #include <QFormLayout>
@@ -30,18 +31,22 @@
 #include <QList>
 #include <QListWidget>
 #include <QMap>
+#include <QMessageBox>
 #include <QPointer>
 #include <QSaveFile>
 #include <QScreen>
 #include <QScrollArea>
 #include <QSettings>
 #include <QTabWidget>
+#include <QTabBar>
 #include <QTimer>
 #include <QVBoxLayout>
 #endif
 
 #include <cstdlib>
 #include <cstring>
+#include <functional>
+#include <memory>
 
 #include <NickelHook.h>
 #include "native.h"
@@ -137,6 +142,8 @@ static QStringList nm_menu_fields(const QString &line) {
             trimmed.mid(p2 + 1, p3 - p2 - 1).trimmed(), trimmed.mid(p3 + 1).trimmed()};
 }
 
+static QString nm_ui_item_text(const QStringList &fields);
+
 static bool nm_read_ui_items(QListWidget *list, QMap<QString, QByteArray> *snapshots) {
     if (!nm_config_valid()) return false;
     const QDir dir(QLatin1String(NM_CONFIG_DIR));
@@ -154,8 +161,7 @@ static bool nm_read_ui_items(QListWidget *list, QMap<QString, QByteArray> *snaps
             const QStringList parsed = nm_menu_fields(lines[i]);
             if (parsed.isEmpty()) continue;
             const QStringList fields{info.filePath(), QString::number(i), parsed[0], parsed[1], parsed[2], parsed[3]};
-            auto *item = new QListWidgetItem(fields[3] + QLatin1String(" / ") + fields[2]
-                                             + QLatin1String(" / ") + info.fileName(), list);
+            auto *item = new QListWidgetItem(nm_ui_item_text(fields), list);
             item->setData(Qt::UserRole, fields);
         }
     }
@@ -226,7 +232,64 @@ static bool nm_write_ui_items(QListWidget *list, const QMap<QString, QByteArray>
     return false;
 }
 
-static QWidget *nm_native_view(const QString &title) {
+static void nm_confirm_discard(QWidget *parent, std::function<void()> discard,
+                               std::function<void()> stay) {
+    auto ctor = reinterpret_cast<void (*)(QDialog *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN18ConfirmationDialogC2EP7QWidget"));
+    auto setTitle = reinterpret_cast<void (*)(QDialog *, const QString &)>(dlsym(RTLD_DEFAULT, "_ZN18ConfirmationDialog8setTitleERK7QString"));
+    auto setText = reinterpret_cast<void (*)(QDialog *, const QString &)>(dlsym(RTLD_DEFAULT, "_ZN18ConfirmationDialog7setTextERK7QString"));
+    auto acceptText = reinterpret_cast<void (*)(QDialog *, const QString &)>(dlsym(RTLD_DEFAULT, "_ZN18ConfirmationDialog19setAcceptButtonTextERK7QString"));
+    auto rejectText = reinterpret_cast<void (*)(QDialog *, const QString &)>(dlsym(RTLD_DEFAULT, "_ZN18ConfirmationDialog19setRejectButtonTextERK7QString"));
+    if (ctor && setTitle && setText && acceptText && rejectText && nh_native_type("ConfirmationDialog").isValid()) {
+        auto *dialog = reinterpret_cast<QDialog *>(nm_native_storage("ConfirmationDialog", 0));
+        if (dialog) {
+            ctor(dialog, parent);
+            setTitle(dialog, QStringLiteral("Discard changes?"));
+            setText(dialog, QStringLiteral("Your NickelMenu changes have not been applied."));
+            acceptText(dialog, QStringLiteral("Discard"));
+            rejectText(dialog, QStringLiteral("Keep editing"));
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            QObject::connect(dialog, &QDialog::accepted, parent, std::move(discard));
+            QObject::connect(dialog, &QDialog::rejected, parent, std::move(stay));
+            dialog->open();
+            return;
+        }
+    }
+    if (QMessageBox::question(parent, QStringLiteral("Discard changes?"),
+            QStringLiteral("Your NickelMenu changes have not been applied."),
+            QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Discard)
+        discard();
+    else
+        stay();
+}
+
+class NmCloseGuard final : public QObject {
+public:
+    NmCloseGuard(QWidget *view, std::function<bool()> dirty, std::function<void()> stay = {})
+        : QObject(view), view(view), dirty(std::move(dirty)), stay(std::move(stay)) {
+        setObjectName(QStringLiteral("nmCloseGuard"));
+        view->installEventFilter(this);
+    }
+    void allow() { allowed = true; }
+    void setStay(std::function<void()> callback) { stay = std::move(callback); }
+protected:
+    bool eventFilter(QObject *, QEvent *event) override {
+        if (event->type() != QEvent::Close || allowed || !dirty()) return false;
+        event->ignore();
+        if (confirming) return true;
+        confirming = true;
+        nm_confirm_discard(view, [this] { allowed = true; view->close(); },
+                           [this] { confirming = false; if (stay) stay(); });
+        return true;
+    }
+private:
+    QWidget *view;
+    std::function<bool()> dirty;
+    std::function<void()> stay;
+    bool allowed = false;
+    bool confirming = false;
+};
+
+static QWidget *nm_native_view(const QString &title, QWidget *parent = nullptr) {
     using NativeDialog = QWidget;
     auto ctor = reinterpret_cast<void (*)(NativeDialog *, QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN8N3DialogC2EP7QWidgetb"));
     auto setTitle = reinterpret_cast<void (*)(NativeDialog *, const QString &)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog8setTitleERK7QString"));
@@ -237,13 +300,21 @@ static QWidget *nm_native_view(const QString &title) {
     if (!ctor || !setTitle || !fullView || !backButton || !disableClose || !setContent || !nh_native_type("N3Dialog").isValid()) return nullptr;
     auto *view = reinterpret_cast<NativeDialog *>(nm_native_storage("N3Dialog", 0));
     if (!view) return nullptr;
-    ctor(view, nullptr, false);
+    ctor(view, parent, false);
     setTitle(view, title);
     fullView(view);
     backButton(view, true);
     disableClose(view);
     view->setAttribute(Qt::WA_DeleteOnClose);
-    view->resize(QGuiApplication::primaryScreen()->availableGeometry().size() * 0.9);
+    QRect area = QGuiApplication::primaryScreen()->availableGeometry();
+    for (QWidget *widget : QApplication::allWidgets()) {
+        if (widget->objectName() == QLatin1String("nmButton") && widget->isVisible()) {
+            const int navTop = widget->mapToGlobal(QPoint(0, 0)).y();
+            if (navTop > area.top() && navTop < area.bottom()) area.setBottom(navTop - 1);
+            break;
+        }
+    }
+    view->setGeometry(area);
     auto *shim = new QPushButton(view);
     shim->hide();
     if (QObject::connect(view, SIGNAL(backTapped()), shim, SIGNAL(pressed())))
@@ -254,6 +325,32 @@ static QWidget *nm_native_view(const QString &title) {
 static void nm_native_set_content(QWidget *view, QWidget *content) {
     auto setContent = reinterpret_cast<void (*)(QWidget *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog10setContentEP7QWidget"));
     setContent(view, content);
+}
+
+static QString nm_choice_label(const QString &key) {
+    static constexpr struct { const char *key; const char *label; } labels[] = {
+        {"main", "NickelMenu tab"}, {"reader", "While reading"},
+        {"browser", "Web browser"}, {"library", "My Books filter"},
+        {"selection", "Selected text"}, {"selection_search", "Selection search"},
+        {"cmd_spawn", "Run a command"}, {"cmd_output", "Show command output"},
+        {"dbg_syslog", "Write to system log"}, {"dbg_error", "Show an error"},
+        {"dbg_msg", "Show a message"}, {"dbg_toast", "Show a brief notice"},
+        {"kfmon", "Launch a KFMon file"}, {"kfmon_id", "Launch a KFMon entry"},
+        {"nickel_setting", "Change a Kobo setting"},
+        {"nickel_browser", "Open a web page"}, {"nickel_misc", "Kobo utility"},
+        {"nickel_open", "Open a Kobo screen"}, {"nickel_wifi", "Control Wi-Fi"},
+        {"nickel_orientation", "Change orientation"},
+        {"nickel_screenshot", "Take a screenshot"},
+        {"power", "Sleep, restart or power off"},
+        {"skip", "Skip chained actions"}, {"uninstall", "Uninstall NickelMenu"},
+    };
+    for (const auto &entry : labels)
+        if (key == QLatin1String(entry.key)) return QString::fromLatin1(entry.label);
+    return key;
+}
+
+static QString nm_ui_item_text(const QStringList &fields) {
+    return fields[3] + QStringLiteral("  ·  ") + nm_choice_label(fields[2]);
 }
 
 static QCheckBox *nm_native_checkbox(QWidget *parent, const QString &text) {
@@ -280,7 +377,7 @@ struct nm_choice {
     QStringList items;
     bool native;
     QString currentText() const {
-        if (!native) return static_cast<QComboBox *>(widget)->currentText();
+        if (!native) return static_cast<QComboBox *>(widget)->currentData().toString();
         auto currentIndex = reinterpret_cast<int (*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZNK13TouchDropDown12currentIndexEv"));
         return items.value(currentIndex(widget));
     }
@@ -293,19 +390,19 @@ static nm_choice nm_native_choice(QWidget *parent, QStringList items, const QStr
     auto currentIndex = dlsym(RTLD_DEFAULT, "_ZNK13TouchDropDown12currentIndexEv");
     if (!ctor || !addItem || !setCurrentIndex || !currentIndex || !nh_native_type("TouchDropDown").isValid()) {
         auto *combo = new QComboBox(parent);
-        combo->addItems(items);
-        combo->setCurrentText(selected);
+        for (const QString &key : items) combo->addItem(nm_choice_label(key), key);
+        combo->setCurrentIndex(qMax(0, items.indexOf(selected)));
         return {combo, items, false};
     }
     auto *choice = reinterpret_cast<QWidget *>(nm_native_storage("TouchDropDown", 0));
     if (!choice) {
         auto *combo = new QComboBox(parent);
-        combo->addItems(items);
-        combo->setCurrentText(selected);
+        for (const QString &key : items) combo->addItem(nm_choice_label(key), key);
+        combo->setCurrentIndex(qMax(0, items.indexOf(selected)));
         return {combo, items, false};
     }
     ctor(choice, parent);
-    for (const QString &text : items) addItem(choice, text, QVariant(text), QLocale(), false);
+    for (const QString &key : items) addItem(choice, nm_choice_label(key), QVariant(key), QLocale(), false);
     setCurrentIndex(choice, qMax(0, items.indexOf(selected)));
     return {choice, items, true};
 }
@@ -337,6 +434,7 @@ static void nm_native_keyboard(QWidget *view, const QList<QLineEdit *> &lines) {
 
 static void nm_native_style_button(QPushButton *button) {
     button->setMinimumHeight(64);
+    button->setFocusPolicy(Qt::NoFocus);
     QFont font = button->font();
     font.setPixelSize(30);
     button->setFont(font);
@@ -344,11 +442,12 @@ static void nm_native_style_button(QPushButton *button) {
 }
 
 static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing) {
-    QWidget *editor = nm_native_view(existing ? QStringLiteral("Edit menu item") : QStringLiteral("Add menu item"));
+    QWidget *editor = nm_native_view(existing ? QStringLiteral("Edit menu item") : QStringLiteral("Add menu item"), list->window());
     if (!editor) {
         nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Kobo's native editor is unavailable on this firmware."));
         return;
     }
+    editor->setObjectName(QStringLiteral("nmEditor"));
     auto *content = new QWidget(editor);
     QFont uiFont = content->font();
     uiFont.setPixelSize(28);
@@ -376,11 +475,22 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing) {
         label->setText(oldFields[3]);
         argument->setText(oldFields[5]);
     }
+    const QString initialLocation = existing ? oldFields[2] : QStringLiteral("main");
+    const QString initialAction = existing ? oldFields[4] : QStringLiteral("dbg_msg");
+    const QString initialLabel = label->text();
+    const QString initialArgument = argument->text();
+    auto *guard = new NmCloseGuard(editor, [location, action, label, argument,
+                                           initialLocation, initialAction, initialLabel, initialArgument] {
+        return location.currentText() != initialLocation || action.currentText() != initialAction
+            || label->text() != initialLabel || argument->text() != initialArgument;
+    });
     for (auto *widget : {location.widget, static_cast<QWidget *>(label),
                          action.widget, static_cast<QWidget *>(argument)}) {
         widget->setMinimumHeight(64);
         widget->setFont(uiFont);
     }
+    location.widget->setFocusPolicy(Qt::NoFocus);
+    action.widget->setFocusPolicy(Qt::NoFocus);
     form->addRow(QStringLiteral("Menu"), location.widget);
     form->addRow(QStringLiteral("Label"), label);
     form->addRow(QStringLiteral("Action"), action.widget);
@@ -390,11 +500,11 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing) {
         if (auto *caption = form->labelForField(widget)) caption->setFont(uiFont);
     layout->addLayout(form);
     layout->addStretch();
-    auto *save = new QPushButton(QStringLiteral("Save item"), content);
+    auto *save = new QPushButton(QStringLiteral("Done"), content);
     nm_native_style_button(save);
     layout->addWidget(save);
     nm_native_set_content(editor, content);
-    QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, location, label, action, argument] {
+    QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, location, label, action, argument, guard] {
         if (label->text().trimmed().isEmpty() || label->text().contains(':') || label->text().contains('\n')
             || label->text().contains('\r') || argument->text().contains('\n') || argument->text().contains('\r')) {
             nm_show_dialog(QStringLiteral("Menu item"), QStringLiteral("Enter a label without colons or line breaks, and a one-line argument."));
@@ -405,7 +515,8 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing) {
         const QStringList fields{previous[0], previous[1], location.currentText(), label->text().trimmed(), action.currentText(), argument->text()};
         auto *item = existing ? existing : new QListWidgetItem(list);
         item->setData(Qt::UserRole, fields);
-        item->setText(fields[3] + QLatin1String(" / ") + fields[2] + QLatin1String(" / ") + QFileInfo(fields[0]).fileName());
+        item->setText(nm_ui_item_text(fields));
+        guard->allow();
         editor->close();
     });
     editor->show();
@@ -428,11 +539,13 @@ static void nm_show_feature_settings() {
     layout->setContentsMargins(22, 8, 22, 18);
     layout->setSpacing(14);
     auto *tabs = new QTabWidget(content);
+    tabs->tabBar()->setFocusPolicy(Qt::NoFocus);
     tabs->setStyleSheet(QStringLiteral(
         "QTabWidget::pane { border: 0; border-top: 1px solid #aaa; }"
         "QTabBar::tab { border: 0; background: white; min-height: 58px; min-width: 180px; padding: 4px 12px; font-size: 25px; }"
         "QTabBar::tab:selected { border-bottom: 4px solid black; font-weight: bold; }"
-        "QListWidget { border: 0; font-size: 30px; } QListWidget::item { min-height: 64px; }"));
+        "QListWidget { border: 0; font-size: 30px; } QListWidget::item { min-height: 64px; }"
+        "QListWidget::item:selected { background: #dedede; color: black; border-bottom: 2px solid black; }"));
     layout->addWidget(tabs);
     auto *scroll = new QScrollArea(tabs);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -445,6 +558,7 @@ static void nm_show_feature_settings() {
         auto *box = nm_native_checkbox(featureList, QLatin1String(feature.label));
         box->setChecked(nm_feature_enabled(feature.key));
         box->setMinimumHeight(70);
+        box->setFocusPolicy(Qt::NoFocus);
         QFont font = box->font();
         font.setPixelSize(26);
         box->setFont(font);
@@ -456,26 +570,39 @@ static void nm_show_feature_settings() {
     tabs->addTab(scroll, QStringLiteral("Features"));
     auto *menuPage = new QWidget(tabs);
     auto *menuLayout = new QVBoxLayout(menuPage);
-    auto *hint = new QLabel(QStringLiteral("Menu items in .adds/nm. Changes are written to the same files when you save."), menuPage);
+    menuLayout->setContentsMargins(0, 0, 0, 0);
+    auto *hint = new QLabel(QStringLiteral("Choose an item to edit or remove. Tap Apply changes to update your menus and .adds/nm files."), menuPage);
     hint->setWordWrap(true);
     hint->setFont(uiFont);
     menuLayout->addWidget(hint);
     auto *menuItems = new QListWidget(menuPage);
+    menuItems->setFocusPolicy(Qt::NoFocus);
     menuItems->setFont(uiFont);
     menuItems->setSpacing(8);
     menuLayout->addWidget(menuItems);
     auto snapshots = QMap<QString, QByteArray>{};
     const bool editable = nm_read_ui_items(menuItems, &snapshots);
-    auto *menuButtons = new QHBoxLayout;
-    auto *add = new QPushButton(QStringLiteral("Add"), menuPage);
-    auto *edit = new QPushButton(QStringLiteral("Edit"), menuPage);
-    auto *remove = new QPushButton(QStringLiteral("Remove"), menuPage);
+    auto *menuButtons = new QVBoxLayout;
+    auto *add = new QPushButton(QStringLiteral("Add menu item"), menuPage);
+    auto *edit = new QPushButton(QStringLiteral("Edit selected"), menuPage);
+    auto *remove = new QPushButton(QStringLiteral("Remove selected"), menuPage);
     for (auto *button : {add, edit, remove}) {
         nm_native_style_button(button);
         button->setEnabled(editable);
-        menuButtons->addWidget(button);
     }
+    edit->setEnabled(false);
+    remove->setEnabled(false);
+    menuButtons->addWidget(add);
+    auto *selectedButtons = new QHBoxLayout;
+    selectedButtons->addWidget(edit);
+    selectedButtons->addWidget(remove);
+    menuButtons->addLayout(selectedButtons);
     menuLayout->addLayout(menuButtons);
+    QObject::connect(menuItems, &QListWidget::currentItemChanged, view,
+        [edit, remove, editable](QListWidgetItem *item) {
+            edit->setEnabled(editable && item);
+            remove->setEnabled(editable && item);
+        });
     tabs->addTab(menuPage, QStringLiteral("Menu items"));
     QObject::connect(add, &QPushButton::clicked, view, [menuItems] { nm_edit_ui_item(menuItems, nullptr); });
     QObject::connect(edit, &QPushButton::clicked, view, [menuItems] {
@@ -485,11 +612,24 @@ static void nm_show_feature_settings() {
         delete menuItems->takeItem(menuItems->currentRow());
     });
     if (!editable) nm_show_dialog(QStringLiteral("Menu items"), QStringLiteral("A config file could not be read or validated. Menu items are protected from changes."));
-    auto *save = new QPushButton(QStringLiteral("Save settings"), content);
+    QList<bool> initialFeatures;
+    for (QCheckBox *box : boxes) initialFeatures << box->isChecked();
+    QList<QStringList> initialItems;
+    for (int i = 0; i < menuItems->count(); ++i)
+        initialItems << menuItems->item(i)->data(Qt::UserRole).toStringList();
+    auto *guard = new NmCloseGuard(view, [boxes, menuItems, initialFeatures, initialItems] {
+        for (qsizetype i = 0; i < boxes.size(); ++i)
+            if (boxes[i]->isChecked() != initialFeatures[i]) return true;
+        if (menuItems->count() != initialItems.size()) return true;
+        for (int i = 0; i < menuItems->count(); ++i)
+            if (menuItems->item(i)->data(Qt::UserRole).toStringList() != initialItems[i]) return true;
+        return false;
+    });
+    auto *save = new QPushButton(QStringLiteral("Apply changes"), content);
     nm_native_style_button(save);
     layout->addWidget(save);
     nm_native_set_content(view, content);
-    QObject::connect(save, &QPushButton::clicked, view, [view, boxes, menuItems, editable, snapshots] {
+    QObject::connect(save, &QPushButton::clicked, view, [view, boxes, menuItems, editable, snapshots, guard] {
         if (editable && !nm_write_ui_items(menuItems, snapshots)) {
             nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save menu items."));
             return;
@@ -502,6 +642,8 @@ static void nm_show_feature_settings() {
             nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save feature settings."));
             return;
         }
+        nm_global_config_reload();
+        guard->allow();
         view->close();
     });
     auto getActive = reinterpret_cast<QWidget *(*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN11MainNavView18getActiveNavButtonEv"));
@@ -516,11 +658,45 @@ static void nm_show_feature_settings() {
         if (nav && menuTab) {
             QPointer<QWidget> previous = getActive(nav);
             QPointer<QWidget> tab = menuTab;
+            auto restore = std::make_shared<QPointer<QWidget>>(previous);
             if (previous && previous != tab) setActive(previous, false);
             setActive(menuTab, true);
-            QObject::connect(view, &QObject::destroyed, [previous, tab, setActive] {
+            guard->setStay([previous, tab, restore, setActive] {
+                if (*restore && *restore != tab) setActive(*restore, false);
+                if (tab) setActive(tab, true);
+                *restore = previous;
+            });
+            for (QWidget *button : QApplication::allWidgets()) {
+                if (!button->inherits("MainNavButton") || button == menuTab) continue;
+                auto *shim = new QPushButton(view);
+                shim->hide();
+                if (QObject::connect(button, SIGNAL(tapped()), shim, SIGNAL(pressed())))
+                    QObject::connect(shim, &QPushButton::pressed, view, [view, button, previous, tab, restore, setActive] {
+                        *restore = button;
+                        setActive(button, false);
+                        if (tab) setActive(tab, true);
+                        if (auto *child = view->findChild<QWidget *>(QStringLiteral("nmEditor"), Qt::FindDirectChildrenOnly);
+                                child && child->isVisible()) {
+                            auto pending = std::make_shared<bool>(true);
+                            if (auto *childGuard = static_cast<NmCloseGuard *>(child->findChild<QObject *>(QStringLiteral("nmCloseGuard"))))
+                                childGuard->setStay([previous, tab, restore, setActive, pending] {
+                                    *pending = false;
+                                    if (*restore && *restore != tab) setActive(*restore, false);
+                                    if (tab) setActive(tab, true);
+                                    *restore = previous;
+                                });
+                            QObject::connect(child, &QObject::destroyed, view, [view, pending] {
+                                if (*pending) view->close();
+                            });
+                            child->close();
+                            return;
+                        }
+                        view->close();
+                    });
+            }
+            QObject::connect(view, &QObject::destroyed, [restore, tab, setActive] {
                 if (tab) setActive(tab, false);
-                if (previous) setActive(previous, true);
+                if (*restore) setActive(*restore, true);
             });
         }
     }

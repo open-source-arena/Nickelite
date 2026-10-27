@@ -51,8 +51,9 @@ for a full-rootfs replacement.
 | Pocket library and Reading Life awards routes | **Missing on Qt 6**; routes return an unsupported error. | Firmware no longer exposes the old routes; Settings cannot enable them. |
 
 The built-in **NickelMenu Settings** full-screen view controls the supported action groups
-above. All switches default to on. Save writes the hidden
-`.adds/nm/.features.ini` file on onboard storage; Back leaves it unchanged.
+above. All switches default to on. Apply changes writes the hidden
+`.adds/nm/.features.ini` file on onboard storage; Back or another bottom tab
+asks before discarding unsaved changes.
 The earlier popup opened on the physical N365 running 6.0.279225, and checkbox
 choices persisted between openings. A disabled action has passed the 5.18
 simulator check. On the physical N365, turning Dropbox off blocked its menu
@@ -78,7 +79,12 @@ two-tab editor and displayed it on a fresh, empty configuration. A later
 native full-screen Settings view passed on the 6.0.279225 simulator: the
 NickelMenu navigation tab was active, Kobo's Back button returned to the
 previous tab, Kobo's keyboard entered text, and the native menu selector saved
-`reader` to the config file. The view still awaits a physical touchscreen check.
+`reader` to the config file. The first native view passed a physical touchscreen
+check. Its revised layout and discard flow passed 5.18 and 6.0 simulator checks
+and await a physical check. The menu and action choices now show readable names
+while preserving their config keys. Apply changes forces a menu reload, so
+edits appear without a reboot even when the onboard filesystem timestamp is
+unchanged.
 
 ## Feasibility of the remaining old features
 
