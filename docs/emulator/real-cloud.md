@@ -127,6 +127,30 @@ apply only to the QEMU userspace guest; the earlier physical repeat-open
 panic remains unresolved. Dropbox EPUB import and a full library sync were
 not verified in this run.
 
+### NickelMenu action route check (2026-10-27)
+
+The earlier linked-account checks used Kobo's stock More menu. To exercise
+NickelMenu's actual route, add this **emulator-only** file to
+`$work/onboard/.adds/nm/cloud-reentry-test` and restart the guest:
+
+```text
+menu_item:main:QEMU Dropbox route:nickel_open:library:dropbox
+menu_item:main:QEMU Google Drive route:nickel_open:library:gdrive
+```
+
+The original Qt6 cloud action invoked `MoreController` directly while the
+NickelMenu touch-menu event was still unwinding. The QEMU guest logged a
+`GDriveView` push but did not reliably show it or respond to further taps.
+The candidate in `src/action_cc.cc` schedules that call 250 ms later. With
+linked accounts and real network access, this candidate opened the Google
+Drive file list twice from Home, switched Google Drive → Dropbox → Google
+Drive through the NickelMenu actions, and remained responsive. The syslog
+showed each native method return and each corresponding cloud view push, with
+no fatal signal. The Kobo EPUB fixture had already downloaded and opened in
+this guest through the stock cloud UI. These QEMU observations do not prove
+that the physical N365 repeat-entry panic is fixed; keep the reader on the
+containment build until a separate device test passes.
+
 ## Reuse or remove the guest
 
 The account-bearing data lives under `$work/onboard`, outside the image. Stop

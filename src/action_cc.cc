@@ -8,6 +8,7 @@
 #include <QString>
 #include <QStringList>
 #include <QTextDocument>
+#include <QTimer>
 #include <QUrl>
 #include <QVariant>
 #include <QWidget>
@@ -171,9 +172,12 @@ NM_ACTION_(nickel_open) {
         NM_CHECK(nullptr, object, "native MoreController unavailable");
 
         const bool dropbox = !strcmp(arg2, "dropbox");
-        NM_LOG("Qt6 cloud route: invoking native %s MoreController gate", dropbox ? "Dropbox" : "Google Drive");
-        open(reinterpret_cast<MoreController *>(object));
-        NM_LOG("Qt6 cloud route: native %s MoreController method returned", dropbox ? "Dropbox" : "Google Drive");
+        // shortcut: 250 ms lets Nickel's touch menu finish closing; use a menu-destroyed hook if slower firmware needs it.
+        QTimer::singleShot(250, app, [object, open, dropbox] {
+            NM_LOG("Qt6 cloud route: invoking native %s MoreController gate", dropbox ? "Dropbox" : "Google Drive");
+            open(reinterpret_cast<MoreController *>(object));
+            NM_LOG("Qt6 cloud route: native %s MoreController method returned", dropbox ? "Dropbox" : "Google Drive");
+        });
         return nm_action_result_silent();
     }
 #endif

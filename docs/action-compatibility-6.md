@@ -112,6 +112,15 @@ state during event handling, but does not prove controller reentry caused it.
 The physical sequence ties the crashes to repeated Google Drive selection; the
 logs themselves do not encode taps. Raw logs remain private.
 
+On 2026-10-27, a linked-account, networked QEMU guest exercised the exact
+NickelMenu cloud actions for the first time. A source candidate defers the
+native `MoreController` call by 250 ms so the NickelMenu touch popup can
+finish closing. In QEMU, two Google Drive entries from Home and a Google
+Drive → Dropbox → Google Drive switch opened the expected file lists without
+a fatal signal. This is evidence for a menu-event timing problem, not proof
+of the physical SIGSEGV's cause or a physical fix. The N365 remains on the
+cloud-disabled containment build pending device testing.
+
 ## Qt6 cloud routing status
 
 The prior Qt6 candidate called the native Dropbox/Google Drive workflow
