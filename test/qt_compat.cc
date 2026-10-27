@@ -117,6 +117,10 @@ int main(int argc, char **argv) {
         QFile firmware(QString::fromLocal8Bit(info.dli_fname));
         assert(firmware.open(QIODevice::ReadOnly));
         assert(nm_hash_exact_target_libnickel(firmware));
+        const nm_cloud_firmware_signature *signature = nullptr;
+        for (const auto &candidate : nm_cloud_firmware_signatures)
+            if (nm_hash_target_libnickel(firmware, candidate)) signature = &candidate;
+        assert(signature);
         const auto enabled = QByteArray::fromHex("00b5012000bd");
 
         QTemporaryFile patchedFirmware;
@@ -125,9 +129,9 @@ int main(int argc, char **argv) {
             const QByteArray chunk = firmware.read(16 * 1024);
             assert(!chunk.isEmpty() && patchedFirmware.write(chunk) == chunk.size());
         }
-        assert(patchedFirmware.seek(0x00f5b9b4));
+        assert(patchedFirmware.seek(signature->dropboxOffset));
         assert(patchedFirmware.write(enabled) == enabled.size());
-        assert(patchedFirmware.seek(0x00f5b9e4));
+        assert(patchedFirmware.seek(signature->googleDriveOffset));
         assert(patchedFirmware.write(enabled) == enabled.size());
         assert(patchedFirmware.flush() && nm_hash_exact_target_libnickel(patchedFirmware));
         assert(patchedFirmware.seek(0));

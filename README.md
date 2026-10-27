@@ -6,8 +6,8 @@ See the [website](https://pgaskin.net/NickelMenu) and [thread on MobileRead](htt
 
 ## NickelMenuNG: experimental Kobo 6.x build
 
-This checkout targets Kobo's Qt 6 firmware, with **6.0.274403** as the validation
-target. It reuses [Nico Verbruggen's Qt 6 port](https://github.com/nicoverbruggen/NickelMenu/tree/1a15faa9d0de810cd96a1a53359e175be4c7c7d5)
+This checkout targets Kobo's Qt 6 firmware, with **6.0.274403 and 6.0.279225**
+as exact cloud-compatibility targets. It reuses [Nico Verbruggen's Qt 6 port](https://github.com/nicoverbruggen/NickelMenu/tree/1a15faa9d0de810cd96a1a53359e175be4c7c7d5)
 on top of [upstream NickelMenu](https://github.com/pgaskin/NickelMenu/tree/bc799ebe95a413a4857aa97a88e2b16557e6427f),
 and vendors its [NickelHook dependency](https://github.com/nicoverbruggen/NickelHook/tree/03abed0c8e6226c1fca75906b7906d5d11664055),
 with a local fix to restore GOT page protection after hooking or rollback.
@@ -21,8 +21,12 @@ opened with their expected content markers. The prior `a46` candidate panicked
 on repeat Google Drive entry and was rolled back before this test. See [the
 compatibility results](docs/action-compatibility-6.md) for that history and
 remaining limits.
-A successful build or symbol check does not establish compatibility with other
-6.x releases or devices.
+The 6.0.279225 full-rootfs update removed the NickelMenu plugin directory. A
+new build passed ARM tests and linked-account cloud-list entry, repeat entry,
+and provider switching in the QEMU userspace simulator; see the
+[6.0.279225 report](docs/firmware-6.0.279225.md). Physical cloud testing on
+that firmware is pending. A successful build or symbol check does not establish
+compatibility with other 6.x releases or devices.
 
 The repository contains source, the vendored NickelHook dependency, and local
 build instructions. It excludes generated `dist/` packages, firmware payloads
@@ -44,7 +48,7 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
 The result is `Kobo.tgz`, containing only `imageformats/libnm.so`. Qt 6 firmware
 extracts this archive under `/usr/local/Kobo`; use this filename when copying it
 to `.kobo`. The Qt 5 `KoboRoot.tgz` package has a different extraction root.
-To install on the tested firmware, back up `.adds/nm`, remove any existing
+To install on either listed firmware, back up `.adds/nm`, remove any existing
 `.adds/nm/uninstall` marker, and copy the freshly built `Kobo.tgz` to the mounted
 reader's `.kobo/` directory. Safely eject and disconnect so the reader can apply
 it. Keep Qt5 and Qt6 packages separate.

@@ -1,8 +1,8 @@
 # Recreate the real-network Kobo 6 simulator
 
-This procedure reproduces the 2026-10-27 QEMU ARM userspace test of Kobo
-6.0.274403 on an N365 profile. It uses Kobo's unmodified DNS, certificate
-store, HTTPS endpoints and cloud device-link pages. QEMU has no Wi-Fi radio;
+This procedure reproduces the 2026-10-27 QEMU ARM userspace tests of Kobo
+6.0.274403 and 6.0.279225 on an N365 profile. It uses Kobo's unmodified DNS,
+certificate store, HTTPS endpoints and cloud device-link pages. QEMU has no Wi-Fi radio;
 the **emulator-only** source patch reports connected state only after a
 peer-verified TLS handshake with `www.kobo.com` succeeds. The Docker bridge has
 ordinary outbound networking. It does not simulate a booted Kobo board, power,
@@ -10,7 +10,8 @@ USB hardware or the firmware updater.
 
 The cloud plugin on this branch is experimental. The `09f8dc6` source was
 verified on one physical N365 running 6.0.274403 after earlier builds panicked
-on repeat cloud entry. Other devices and firmware versions are unverified.
+on repeat cloud entry. Firmware 6.0.279225 passed simulator cloud-list entry,
+repeat entry and provider switching; physical cloud behavior is still pending.
 
 ## Prerequisites
 
@@ -36,7 +37,9 @@ mkdir -p "$work"
 
 ## Build the display backend and account-capable plugin
 
-The VNC backend patch is required for repaint and touch input:
+The VNC backend patch is required for repaint. It sends mouse events; on
+6.0.279225 a click may only focus a control, requiring Return to activate it.
+It does not reproduce the Kobo touch controller or swipe gestures:
 
 ```sh
 docker build --target build -t nickelmenung-qt6-sdk-build \
@@ -46,7 +49,7 @@ docker run --rm --network none -v "$PWD/docs/emulator:/out" \
 ```
 
 Build the experimental plugin in a disposable copy of this branch. The patch
-is restricted to the exact N365 firmware hash and only activates when
+is restricted to the recognized N365 firmware hashes and only activates when
 `NM_QEMU_WIFI_CONNECTED=1`. It is intentionally absent from production source:
 
 ```sh
@@ -75,9 +78,11 @@ existing extracted rootfs. If your distribution puts `qemu-arm-static`
 elsewhere, supply its absolute path as the third argument.
 
 ```sh
-sh docs/emulator/build-image.sh "$work" "$work/plugin-src/Kobo.tgz"
-sh docs/emulator/run-real-network.sh "$work" "$novnc" 6093
+NM_FIRMWARE_VERSION=6.0.279225 sh docs/emulator/build-image.sh "$work" "$work/plugin-src/Kobo.tgz"
+NM_FIRMWARE_VERSION=6.0.279225 sh docs/emulator/run-real-network.sh "$work" "$novnc" 6093
 ```
+
+Omit `NM_FIRMWARE_VERSION` in both commands for the 6.0.274403 image.
 
 Open <http://127.0.0.1:6093/vnc.html?autoconnect=1&resize=scale> on the same
 computer. Keep the second command running in its terminal. The browser bridge

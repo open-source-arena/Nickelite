@@ -6,10 +6,23 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 work=${1:?usage: build-image.sh WORK_DIRECTORY EXPERIMENTAL_KOBO_TGZ [QEMU_ARM_STATIC]}
 plugin=${2:?usage: build-image.sh WORK_DIRECTORY EXPERIMENTAL_KOBO_TGZ [QEMU_ARM_STATIC]}
 qemu=${3:-/usr/bin/qemu-arm-static}
-firmware_url=https://ereaderfiles.kobo.com/firmwares/kobo12/Sep2026/qt6-update-6.0.274403.zip
-firmware_hash=31d1462b3c7ae9f850c04b752b654404407cc4605c50885318a876ddb3b9ce47
-rootfs_hash=6d401357e39891c48c99011f76fe5c8f6b852c497707a8765566674521db864c
-image=nickelmenung-simulator-6.0.274403:latest
+firmware=${NM_FIRMWARE_VERSION:-6.0.274403}
+case "$firmware" in
+    6.0.274403)
+        firmware_url=https://ereaderfiles.kobo.com/firmwares/kobo12/Sep2026/qt6-update-6.0.274403.zip
+        firmware_hash=31d1462b3c7ae9f850c04b752b654404407cc4605c50885318a876ddb3b9ce47
+        rootfs_hash=6d401357e39891c48c99011f76fe5c8f6b852c497707a8765566674521db864c
+        libnickel_hash=b22059eb126d355312f69abb9d1cafc72f0cf54ed4ffe5607eadda2d65670df7
+        ;;
+    6.0.279225)
+        firmware_url=https://ereaderfiles.kobo.com/firmwares/kobo12/Oct2026/qt6-update-6.0.279225.zip
+        firmware_hash=48b777179a79f68a5d1216e2a8ae20936f1bfacb6c5595351c9a6104b058f2ac
+        rootfs_hash=0b77560f6d8c4eda0a446e087281a9ec05d8b9374f0654f0864682ef17650865
+        libnickel_hash=82c877261652bec2a7d601b1ac3007f48bd6f3b39dd1950b19d0869cb29a7a44
+        ;;
+    *) echo "unsupported firmware: $firmware" >&2; exit 1 ;;
+esac
+image="nickelmenung-simulator-$firmware:latest"
 
 for command in curl unzip tar zstd debugfs sha256sum docker; do
     command -v "$command" >/dev/null || { echo "missing $command" >&2; exit 1; }
@@ -39,15 +52,14 @@ mkdir "$work/rootfs"
 # Unprivileged debugfs emits one harmless chown warning per extracted file.
 debugfs -R "rdump / $work/rootfs" "$work/rootfs.raw" 2> "$work/debugfs.log"
 test -f "$work/rootfs/usr/local/Kobo/libnickel.so.1.0.0"
-printf '%s  %s\n' \
-    b22059eb126d355312f69abb9d1cafc72f0cf54ed4ffe5607eadda2d65670df7 \
+printf '%s  %s\n' "$libnickel_hash" \
     "$work/rootfs/usr/local/Kobo/libnickel.so.1.0.0" | sha256sum -c -
 
 cp "$qemu" "$work/rootfs/qemu-arm-static"
 cp "$repo/docs/emulator/start-guest.sh" "$work/rootfs/emulator-start.sh"
-mkdir -p "$work/rootfs/usr/local/Kobo/platforms"
+mkdir -p "$work/rootfs/usr/lib/plugins/platforms"
 cp "$repo/docs/emulator/libqvnc-repaint.so" \
-    "$work/rootfs/usr/local/Kobo/platforms/libqvnc.so"
+    "$work/rootfs/usr/lib/plugins/platforms/libqvnc.so"
 tar -xzf "$plugin" -C "$work/rootfs/usr/local/Kobo"
 cat > "$work/rootfs/emulator-offline.conf" <<'EOF'
 [ApplicationPreferences]

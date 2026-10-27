@@ -1,18 +1,39 @@
 --- a/src/nickelmenu.cc
 +++ b/src/nickelmenu.cc
-@@ -9,0 +10,2 @@
+@@ -7,6 +7,8 @@
+ #include <QLayout>
+ #include <QMenu>
+ #include <QMetaProperty>
 +#include <QNetworkProxy>
 +#include <QSslSocket>
-@@ -17,0 +20,4 @@
+ #include <QPushButton>
+ #include <QRegularExpression>
+ #include <QString>
+@@ -15,6 +17,10 @@
+ #include <QWidgetAction>
+ 
+ #include <cstdlib>
 +#include <cstdint>
 +#include <dlfcn.h>
 +#include <sys/mman.h>
 +#include <unistd.h>
-@@ -111,0 +118,3 @@
+ 
+ #include <NickelHook.h>
+ #include "native.h"
+@@ -109,6 +115,9 @@
+ static bool (*Device_supportsGoogleDrive)(const void *) = nullptr;
+ static bool (*Device_isSpaKoboBW)(const void *) = nullptr;
+ static bool nm_exact_n365_firmware = false;
 +static bool (*WirelessManager_connected)(void *) = nullptr;
 +static bool nm_qemu_wifi_connected = false;
 +static bool nm_qemu_official_network_ready = false;
-@@ -168,0 +178,54 @@
+ 
+ struct nm_cloud_firmware_signature {
+     qint64 dropboxOffset;
+@@ -173,6 +182,61 @@
+     return library.open(QIODevice::ReadOnly) && nm_hash_exact_target_libnickel(library);
+ }
+ 
 +
 +static bool nm_probe_official_kobo_tls() {
 +    QSslSocket socket;
@@ -67,9 +88,22 @@
 +    }
 +    return WirelessManager_connected && WirelessManager_connected(manager);
 +}
-@@ -186,0 +250 @@
++
+ extern "C" __attribute__((visibility("default"))) bool _nm_device_supports_dropbox(const void *device) {
+     if (nm_exact_n365_firmware && Device_isSpaKoboBW && Device_isSpaKoboBW(device)) return true;
+     return Device_supportsDropbox && Device_supportsDropbox(device);
+@@ -198,6 +262,7 @@
+ 
+ static struct nh_hook NickelMenuHook[] = {
+ #if NM_QT_MAJOR >= 6
 +    {.sym = "_ZN15WirelessManager9connectedEv", .sym_new = "_nm_qemu_wireless_connected", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(WirelessManager_connected), .desc = "isolated QEMU Wi-Fi state compatibility", .optional = true},
-@@ -284,0 +349,15 @@
+     {.sym = "_ZNK6Device15supportsDropboxEv", .sym_new = "_nm_device_supports_dropbox", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(Device_supportsDropbox), .desc = "N365 Qt6 cloud capability compatibility", .optional = true},
+     {.sym = "_ZNK6Device19supportsGoogleDriveEv", .sym_new = "_nm_device_supports_google_drive", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(Device_supportsGoogleDrive), .desc = "N365 Qt6 cloud capability compatibility", .optional = true},
+ #endif
+@@ -298,6 +363,21 @@
+     NM_LOG("cloud capability compatibility: %s", nm_exact_n365_firmware
+         ? "target firmware recognized; N365 model check remains active"
+         : "target firmware not recognized; native model gates unchanged");
 +    const char *emulatorWifi = std::getenv("NM_QEMU_WIFI_CONNECTED");
 +    const bool requested = nm_exact_n365_firmware && emulatorWifi
 +        && !std::strcmp(emulatorWifi, "1");
@@ -85,7 +119,16 @@
 +    }
 +    NM_LOG("emulator Wi-Fi state shim: %s",
 +        nm_qemu_wifi_connected ? "exact firmware and official TLS verified" : "disabled");
+ #endif
+     // Each menu and output feature checks its own dependencies before use.
+     for (auto *symbol = NickelMenuDlsym; symbol->name; ++symbol) {
 --- a/Makefile
 +++ b/Makefile
-@@ -11,0 +12 @@
+@@ -3,6 +3,7 @@
+ include $(patsubst %/,%,$(NICKELHOOK))/NickelHook.mk
+ 
+ override PKGCONF  += Qt$(NH_QT_MAJOR)Widgets
 +override PKGCONF += Qt6Network
+ override LIBRARY  := src/libnm.so
+ override SOURCES  += src/action.c src/action_c.c src/action_cc.cc src/config.c src/generator.c src/generator_c.c src/kfmon.c src/nickelmenu.cc src/util.c
+ override CFLAGS   += -Wall -Wextra -Werror -fvisibility=hidden

@@ -6,11 +6,12 @@ umask 077
 work=${1:?usage: run-real-network.sh WORK_DIRECTORY NOVNC_WEB_DIRECTORY [PORT]}
 novnc=${2:?usage: run-real-network.sh WORK_DIRECTORY NOVNC_WEB_DIRECTORY [PORT]}
 port=${3:-6093}
+image="nickelmenung-simulator-${NM_FIRMWARE_VERSION:-6.0.274403}:latest"
 work=$(CDPATH= cd -- "$work" && pwd)
 novnc=$(CDPATH= cd -- "$novnc" && pwd)
 command -v websockify >/dev/null || { echo 'missing websockify' >&2; exit 1; }
 test -f "$novnc/vnc.html" || { echo "missing noVNC in $novnc" >&2; exit 1; }
-docker image inspect nickelmenung-simulator-6.0.274403:latest >/dev/null
+docker image inspect "$image" >/dev/null
 if docker container inspect nm-real-cloud-wifi >/dev/null 2>&1; then
     echo 'nm-real-cloud-wifi already exists; start it explicitly or choose a fresh work directory' >&2
     exit 1
@@ -27,7 +28,7 @@ if ! docker network inspect nm-real-cloud-egress >/dev/null 2>&1; then
 fi
 docker run -d --name nm-real-cloud-wifi --network nm-real-cloud-egress \
     -v "$work/onboard:/mnt/onboard" -v "$work/sys-devices:/sys/devices:ro" \
-    nickelmenung-simulator-6.0.274403:latest >/dev/null
+    "$image" >/dev/null
 ip=$(docker inspect --format '{{with index .NetworkSettings.Networks "nm-real-cloud-egress"}}{{.IPAddress}}{{end}}' nm-real-cloud-wifi)
 test -n "$ip" || { echo 'guest has no network address' >&2; exit 1; }
 echo "Open http://127.0.0.1:$port/vnc.html?autoconnect=1&resize=scale"

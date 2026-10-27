@@ -110,9 +110,20 @@ static bool (*Device_supportsGoogleDrive)(const void *) = nullptr;
 static bool (*Device_isSpaKoboBW)(const void *) = nullptr;
 static bool nm_exact_n365_firmware = false;
 
-static bool nm_hash_exact_target_libnickel(QFile &library) {
-    constexpr qint64 dropboxOffset = 0x00f5b9b4;
-    constexpr qint64 googleDriveOffset = 0x00f5b9e4;
+struct nm_cloud_firmware_signature {
+    qint64 dropboxOffset;
+    qint64 googleDriveOffset;
+    const char *sha256;
+};
+
+static constexpr nm_cloud_firmware_signature nm_cloud_firmware_signatures[] = {
+    {0x00f5b9b4, 0x00f5b9e4, "b22059eb126d355312f69abb9d1cafc72f0cf54ed4ffe5607eadda2d65670df7"}, // 6.0.274403
+    {0x00f5e58c, 0x00f5e5bc, "82c877261652bec2a7d601b1ac3007f48bd6f3b39dd1950b19d0869cb29a7a44"}, // 6.0.279225
+};
+
+static bool nm_hash_target_libnickel(QFile &library, const nm_cloud_firmware_signature &signature) {
+    const qint64 dropboxOffset = signature.dropboxOffset;
+    const qint64 googleDriveOffset = signature.googleDriveOffset;
     constexpr qint64 methodSize = 6;
     static const auto original = QByteArray::fromHex("10b501210446");
     static const auto enabled = QByteArray::fromHex("00b5012000bd");
@@ -145,8 +156,13 @@ static bool nm_hash_exact_target_libnickel(QFile &library) {
         hash.addData(QByteArrayView(buffer, count));
         position += count;
     }
-    return hash.result().toHex()
-        == QByteArrayLiteral("b22059eb126d355312f69abb9d1cafc72f0cf54ed4ffe5607eadda2d65670df7");
+    return hash.result().toHex() == signature.sha256;
+}
+
+static bool nm_hash_exact_target_libnickel(QFile &library) {
+    for (const auto &signature : nm_cloud_firmware_signatures)
+        if (nm_hash_target_libnickel(library, signature)) return true;
+    return false;
 }
 
 static bool nm_is_exact_target_firmware() {
