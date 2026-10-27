@@ -11,23 +11,15 @@ target. It reuses [Nico Verbruggen's Qt 6 port](https://github.com/nicoverbrugge
 on top of [upstream NickelMenu](https://github.com/pgaskin/NickelMenu/tree/bc799ebe95a413a4857aa97a88e2b16557e6427f),
 and vendors its [NickelHook dependency](https://github.com/nicoverbruggen/NickelHook/tree/03abed0c8e6226c1fca75906b7906d5d11664055),
 with a local fix to restore GOT page protection after hooking or rollback.
-The original MIT license and authorship apply. This is an unofficial development build. The experimental source candidate
-builds against the exact firmware libraries. Its a46 package was installed on
-the physical N365 using `.kobo/Kobo.tgz`; USB hash and archive consumption were
-confirmed. Google Drive opened once, then panicked/restarted on reentry and again
-after restart. It was rolled back to c980d6c containment. The current source still
-contains the failed experimental cloud route; do not build or install it as a
-release. The reader is responsive on containment.
-Earlier physical Dropbox/Google Drive checks and subsequent crashes occurred on
-the older installed build identified by its `5955649c` marker. Dropbox's fixture
-initially downloaded/opened, but later Google Drive and Dropbox selections
-caused panic/restarts. The newer source candidate archive was first staged
-under the wrong filename and was not installed, then correctly installed as
-`.kobo/Kobo.tgz`. The c980d6c containment rollback was applied in between; its
-Dropbox disabled message was verified with the reader responsive. The candidate returned to responsive Home after update, then failed on Google
-Drive reentry. Do not open either cloud action. Do not sign out, reset, or use
-firmware recovery. See [the
-compatibility results](docs/action-compatibility-6.md).
+The original MIT license and authorship apply. This is an unofficial
+development build. On a physical Clara BW (N365) running 6.0.274403, the
+`09f8dc6` cloud navigation build was installed through `.kobo/Kobo.tgz`, the
+archive was consumed, and Home remained responsive. Google Drive opened twice
+from Home; Google Drive → Dropbox → Google Drive navigation also worked without
+a panic. A known test EPUB downloaded from Google Drive and opened with its
+expected content marker. The prior `a46` candidate panicked on repeat Google
+Drive entry and was rolled back before this test. See [the compatibility
+results](docs/action-compatibility-6.md) for that history and remaining limits.
 A successful build or symbol check does not establish compatibility with other
 6.x releases or devices.
 

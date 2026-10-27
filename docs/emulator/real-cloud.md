@@ -8,9 +8,9 @@ peer-verified TLS handshake with `www.kobo.com` succeeds. The Docker bridge has
 ordinary outbound networking. It does not simulate a booted Kobo board, power,
 USB hardware or the firmware updater.
 
-The cloud plugin on this branch is experimental. Earlier physical builds
-panicked on repeat cloud entry. **Do not install this build on a physical Kobo.**
-Keep the physical reader on the containment build described in the main README.
+The cloud plugin on this branch is experimental. The `09f8dc6` source was
+verified on one physical N365 running 6.0.274403 after earlier builds panicked
+on repeat cloud entry. Other devices and firmware versions are unverified.
 
 ## Prerequisites
 
@@ -123,9 +123,9 @@ valid PDF headers and end markers. Nickel logged a Foxit metadata warning and
 `dropboxParseFailed`/`googleDriveParseFailed` with a `file path` error. The
 cause of PDF import failure is not established. The guest stayed responsive,
 and Google Drive still opened after the Dropbox error. These observations
-apply only to the QEMU userspace guest; the earlier physical repeat-open
-panic remains unresolved. Dropbox EPUB import and a full library sync were
-not verified in this run.
+apply only to the QEMU userspace guest. At that point the physical repeat-open
+panic remained unresolved; the later delayed-route test below addressed it.
+Dropbox EPUB import and a full library sync were not verified in this run.
 
 ### NickelMenu action route check (2026-10-27)
 
@@ -140,16 +140,18 @@ menu_item:main:QEMU Google Drive route:nickel_open:library:gdrive
 
 The original Qt6 cloud action invoked `MoreController` directly while the
 NickelMenu touch-menu event was still unwinding. The QEMU guest logged a
-`GDriveView` push but did not reliably show it or respond to further taps.
+`GDriveView` push but remained visibly on Home and ignored a More tab tap
+after the same wait used for the candidate. This was confirmed by restoring
+the original plugin in the same guest after the successful candidate run.
 The candidate in `src/action_cc.cc` schedules that call 250 ms later. With
 linked accounts and real network access, this candidate opened the Google
 Drive file list twice from Home, switched Google Drive → Dropbox → Google
 Drive through the NickelMenu actions, and remained responsive. The syslog
 showed each native method return and each corresponding cloud view push, with
 no fatal signal. The Kobo EPUB fixture had already downloaded and opened in
-this guest through the stock cloud UI. These QEMU observations do not prove
-that the physical N365 repeat-entry panic is fixed; keep the reader on the
-containment build until a separate device test passes.
+this guest through the stock cloud UI. A later physical N365 test also passed
+repeat entry, provider switching, and Google Drive EPUB download/open; see
+[the compatibility report](../action-compatibility-6.md).
 
 ## Reuse or remove the guest
 

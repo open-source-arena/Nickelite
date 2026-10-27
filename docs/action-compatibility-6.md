@@ -6,7 +6,26 @@ installed build, and repeat-open testing of the installed source candidate.
 Generated logs, screenshots, settings, test EPUBs and firmware disassembly are
 excluded from publication; the observations below are aggregate findings.
 
-## Current physical checkpoint
+## Current physical checkpoint: delayed cloud route
+
+The `09f8dc6` source candidate was built for Qt6 without the emulator-only
+Wi-Fi patch. Package SHA256:
+`5fe9a7fed54a7eb6247f3b10d8e406f888afcc1e5a541330fd96b00e953db86f`.
+The package was copied to `.kobo/Kobo.tgz` on the physical N365, read back
+with a matching hash, and safely unmounted. After the owner saw the update and
+responsive Home, a second USB mount showed `Kobo.tgz`, `KoboRoot.tgz`, and
+`upgrade` absent. The rootfs library bytes were not read back.
+
+The owner then opened Google Drive from NickelMenu twice, returning to Home
+between entries. Both file lists stayed responsive for about 30 seconds. From
+the Google Drive list, NickelMenu opened Dropbox, then returned to Google
+Drive; both lists stayed responsive. The previously uploaded Google Drive test
+EPUB downloaded and opened in My Books with the expected `WALNUT` marker.
+This verifies the previously failing repeat and provider-switch paths on this
+device and firmware. Dropbox transfer on this build, full library sync, and
+other Kobo models or firmware versions remain unverified.
+
+## Earlier physical checkpoints
 
 Physical actions were performed on the previously installed build, identified
 by the `5955649c` marker. Dropbox initially opened, and its fixture downloaded
@@ -33,7 +52,7 @@ was consumed. This is the first physical installation of a46. From Home, Google 
 its list and the device stayed responsive. Selecting Google Drive a second time
 caused a panic/restart. After that restart, selecting it again caused another
 panic/restart. Root stopped further cloud tests and restored the c980d6c
-containment build. Kobo is responsive; do not open either cloud action on a46.
+containment build before testing the delayed `09f8dc6` candidate above.
 
 The exact physical library bytes were not read back from the device rootfs.
 The package hash identifies the archive staged over USB; it does not prove what
@@ -52,8 +71,8 @@ baseline.
 
 | Feature | Physical outcome | Remaining limit |
 |---|---|---|
-| Dropbox | **OLD 595 BUILD: PASS THEN CRASH.** Its fixture downloaded/opened earlier, then later Dropbox selections caused panic/restarts. **c980d6c: PASS containment check**; expected disabled message appeared and Kobo remained responsive. | Dropbox was not tested on a46. Byte comparison and sync remain unverified. |
-| Google Drive | **OLD 595 BUILD: CRASH.** Repeated selections caused panic/restarts. **a46: REENTRY FAILURE.** The first selection from Home opened the list and stayed responsive; the second selection caused a panic/restart, as did another selection after restart. | No fixture download/open test. Stop cloud actions; containment rollback has been restored. |
+| Dropbox | **09f8dc6: PASS list/navigation.** Opened from Google Drive and remained responsive. The older 595 build passed a fixture download, then later panicked. | A Dropbox file download on 09f8dc6 and full sync remain unverified. |
+| Google Drive | **09f8dc6: PASS repeat entry, provider switching, and test EPUB download/open.** The prior a46 build panicked on repeat entry. | Longer use and other firmware/device combinations remain unverified. |
 | USB Connect | **PARTIAL.** Connect mounts the reader's storage. After safe eject and unplug, the stale Connected screen needs a short normal power press to restore the GUI. | Seamless disconnect recovery is not established; this is not a verified USB recovery fix. |
 
 The c980d6c containment rollback package SHA256 is
@@ -78,13 +97,10 @@ controller as an application child for asynchronous callbacks. It overrides
 the model capability checks only when `libnickel` matches firmware 6.0.274403
 (stock or the exact two-method model patch described below) and the device
 reports `SpaKoboBW`. It does not change user-owned `FeatureSettings` or
-`OneStoreServices` values. The candidate was installed and Home responded after update. Its first Google
-Drive entry opened the list, but reentering Google Drive caused a panic/restart,
-including after a restart. The older Dropbox fixture pass and later cross-service
-crashes belong to the 595 build; Dropbox was not tested on a46. The reader was
-previously rolled back to c980d6c, where Dropbox's disabled message returned to
-a responsive Home screen, then updated to a46 using the correct Qt6 package
-path. Containment has been restored; do not invoke cloud actions meanwhile.
+`OneStoreServices` values. The immediate-call a46 candidate panicked on Google
+Drive reentry and was rolled back. The current `09f8dc6` build delays the call
+until after the NickelMenu touch popup closes; it passed the physical checks
+listed above.
 
 ## Crash evidence
 
@@ -117,9 +133,11 @@ NickelMenu cloud actions for the first time. A source candidate defers the
 native `MoreController` call by 250 ms so the NickelMenu touch popup can
 finish closing. In QEMU, two Google Drive entries from Home and a Google
 Drive → Dropbox → Google Drive switch opened the expected file lists without
-a fatal signal. This is evidence for a menu-event timing problem, not proof
-of the physical SIGSEGV's cause or a physical fix. The N365 remains on the
-cloud-disabled containment build pending device testing.
+a fatal signal. A same-guest control run with the original immediate-call
+plugin logged a view push but remained on Home and ignored the next tab tap.
+This supports a menu-event timing cause; the exact QObject responsible for
+the earlier physical SIGSEGV remains unidentified. The delayed build also
+passed the physical repeat and cross-provider checks above.
 
 ## Qt6 cloud routing status
 
@@ -133,16 +151,14 @@ predicates for N365 on the recognized target firmware, mirroring the approach
 in the historical [Kobo patch PR #139](https://github.com/pgaskin/kobopatch-patches/pull/139).
 That PR targets firmware 4.38.21908 and also requires owner-managed
 `FeatureSettings` and `OneStoreServices` values; it does not establish behavior
-on Qt6 or explain this crash. NickelMenu leaves those settings untouched. The MoreController route plus scoped capability override was installed for
-testing on the N365, then rolled back to c980d6c containment. The first Google Drive entry opened a list; the second entry and a
-post-restart entry both panicked/restarted. The native call returned before the
-crash on both logged events. The controller is parented to the application and
-source lookup reuses the same named child if it exists, but logs do not prove
-that the same object instance was involved. This remains a repeat-open failure,
-not a verified restoration of cloud support. The old direct-manager 595 build
-passed an initial Dropbox entry/list and fixture download/open, then later
-crashed repeatedly on provider selections. No candidate Dropbox or cloud fixture
-download has been verified.
+on Qt6 or explain this crash. NickelMenu leaves those settings untouched. The
+immediate-call MoreController route plus scoped capability override was installed
+on the N365, then rolled back after repeat entry panicked. The native call had
+returned before those crashes. The controller is parented to the application,
+and source lookup reuses the same named child if it exists; logs do not prove
+which object was invalid. The delayed `09f8dc6` route passed repeat entry,
+provider switching, and a Google Drive fixture transfer/open on the physical
+N365. A Dropbox transfer on this build remains unverified.
 
 Upstream [NickelMenu issue #143](https://github.com/pgaskin/NickelMenu/issues/143)
 contains separate reports of Google Drive remaining in a loading loop on Clara
@@ -155,14 +171,12 @@ Qt5 routing is unchanged. The Qt6 candidate logs whether its exact firmware
 guard is active, which provider's native method is invoked, and whether the call
 returned; it does not log account, folder, or file data.
 
-The earlier candidate's Go, Qt6 build and exact-firmware ARM checks do not cover
-the reported panic. Current tests verify fail-closed behavior when native
-MoreController symbols are unavailable; they do not reproduce physical cloud
-service state. The old build's Dropbox fixture pass is superseded for current
-safety guidance by the later crashes. The a46 candidate had a physical
-Google Drive repeat-open failure before it was rolled back to containment. The isolated offline QEMU guest opened the
-blank Google Drive view, returned to Books with Escape, and opened it a second
-time without crashing; this does not model the service state involved on-device.
+The earlier Go, Qt6 build, symbol, and offline QEMU checks did not cover the
+reported panic. The later linked-account QEMU test exercised NickelMenu's
+actual cloud actions, and the physical `09f8dc6` test covered the failing
+repeat and provider-switch sequence. Existing fail-closed tests still cover
+missing native MoreController symbols. The original offline QEMU guest had no
+linked accounts, so its blank-view result remains only a baseline.
 
 ## Publication verification (2026-10-26)
 
@@ -184,7 +198,8 @@ physical reader. The earlier Dropbox fixture pass and later old-build
 panic/restarts were on the 595 build. The c980d6c containment period included a
 passing Dropbox disabled-message check. On a46, Google Drive's first list entry
 opened, but repeated entry panicked/restarted; no candidate fixture download or
-Dropbox test was performed. Root restored containment; the reader is responsive.
+Dropbox test was performed on a46. Root restored containment before installing
+and testing `09f8dc6`, whose results are recorded at the top of this report.
 
 ## Original offline simulator baseline
 
