@@ -50,10 +50,18 @@ for a full-rootfs replacement.
 | Bluetooth actions | **Missing on Qt 6**; action returns an unsupported error. | Needs a new Qt 6 implementation and hardware checks. |
 | Pocket library and Reading Life awards routes | **Missing on Qt 6**; routes return an unsupported error. | Firmware no longer exposes the old routes; Settings cannot enable them. |
 
-The built-in **NickelMenu Settings** full-screen view controls the supported action groups
-above. All switches default to on. Apply changes writes the hidden
+The built-in **NickelMenu Settings** view has **Shortcuts**, **Menu items**, and
+**Permissions** tabs. Shortcuts generate or remove ready-made menu items for
+dark mode, screenshots, rotation, Dropbox, Google Drive, Wi-Fi, Sleep, Restart,
+and Power off. Editing a generated item makes it a custom item; the shortcut
+switch no longer owns it. Permissions control the supported action groups
+above. All permissions default to on. Apply changes writes the hidden
 `.adds/nm/.features.ini` file on onboard storage; Back or another bottom tab
 asks before discarding unsaved changes.
+Each list scrolls with a visible vertical scrollbar, regardless of Kobo model
+or screen size. The USB connection action is available in the custom item
+editor, but is not a ready-made shortcut because it changes the device's
+storage connection state.
 The earlier popup opened on the physical N365 running 6.0.279225, and checkbox
 choices persisted between openings. A disabled action has passed the 5.18
 simulator check. On the physical N365, turning Dropbox off blocked its menu

@@ -36,6 +36,11 @@
 #include <QSaveFile>
 #include <QScreen>
 #include <QScrollArea>
+#include <QScrollBar>
+#include <QScroller>
+#include <QSet>
+#include <QSignalBlocker>
+#include <QStyleFactory>
 #include <QSettings>
 #include <QTabWidget>
 #include <QTabBar>
@@ -79,6 +84,25 @@ static constexpr nm_feature nm_features[] = {
     {"orientation", "Orientation"},
     {"power", "Power controls"},
     {"book_scan", "Book rescan"},
+};
+
+struct nm_shortcut {
+    const char *label;
+    const char *action;
+    const char *argument;
+    const char *permission;
+};
+
+static constexpr nm_shortcut nm_shortcuts[] = {
+    {"Dark mode", "nickel_setting", "toggle:dark_mode", "dark_mode"},
+    {"Screenshot", "nickel_screenshot", "capture", "screenshots"},
+    {"Rotate screen", "nickel_orientation", "swap", "orientation"},
+    {"Dropbox", "nickel_open", "library:dropbox", "dropbox"},
+    {"Google Drive", "nickel_open", "library:gdrive", "gdrive"},
+    {"Wi-Fi", "nickel_wifi", "toggle", "wifi"},
+    {"Sleep", "power", "sleep", "power"},
+    {"Restart", "power", "reboot", "power"},
+    {"Power off", "power", "shutdown", "power"},
 };
 
 static const char *nm_feature_for_action(nm_action_fn_t action, const char *argument) {
@@ -289,6 +313,35 @@ private:
     bool confirming = false;
 };
 
+class NmSystemDialogGuard final : public QObject {
+public:
+    explicit NmSystemDialogGuard(QWidget *view) : QObject(view), view(view) {
+        qApp->installEventFilter(this);
+    }
+protected:
+    bool eventFilter(QObject *object, QEvent *event) override {
+        auto *widget = qobject_cast<QWidget *>(object);
+        if (!widget || widget == view || view->isAncestorOf(widget)
+            || (!widget->isWindow() && !widget->isModal())) return false;
+        const Qt::WindowType type = widget->windowType();
+        if (type == Qt::Popup || type == Qt::ToolTip || type == Qt::Tool || widget->inherits("MainWindow")) return false;
+        if (event->type() == QEvent::Show && !dialogs.contains(widget)) {
+            dialogs.insert(widget);
+            QObject::connect(widget, &QObject::destroyed, this, [this, widget] { resume(widget); });
+            view->hide();
+        } else if (event->type() == QEvent::Hide || event->type() == QEvent::Close) {
+            resume(widget);
+        }
+        return false;
+    }
+private:
+    void resume(QWidget *widget) {
+        if (dialogs.remove(widget) && dialogs.isEmpty() && view) view->show();
+    }
+    QPointer<QWidget> view;
+    QSet<QWidget *> dialogs;
+};
+
 static QWidget *nm_native_view(const QString &title, QWidget *parent = nullptr) {
     using NativeDialog = QWidget;
     auto ctor = reinterpret_cast<void (*)(NativeDialog *, QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN8N3DialogC2EP7QWidgetb"));
@@ -351,6 +404,46 @@ static QString nm_choice_label(const QString &key) {
 
 static QString nm_ui_item_text(const QStringList &fields) {
     return fields[3] + QStringLiteral("  ·  ") + nm_choice_label(fields[2]);
+}
+
+static QListWidgetItem *nm_managed_shortcut(QListWidget *list, const nm_shortcut &shortcut) {
+    for (int i = 0; i < list->count(); ++i) {
+        auto *item = list->item(i);
+        const QStringList fields = item->data(Qt::UserRole).toStringList();
+        if (fields.size() == 6 && fields[0] == nm_ui_items_path && fields[2] == QLatin1String("main")
+            && fields[3] == QLatin1String(shortcut.label) && fields[4] == QLatin1String(shortcut.action)
+            && fields[5] == QLatin1String(shortcut.argument)) return item;
+    }
+    return nullptr;
+}
+
+static QWidget *nm_scroll_page(QAbstractScrollArea *area, QWidget *parent) {
+    area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto *page = new QWidget(parent);
+    auto *layout = new QHBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(4);
+    layout->addWidget(area);
+    auto *bar = new QScrollBar(Qt::Vertical, page);
+    bar->setFixedWidth(42);
+    bar->setFocusPolicy(Qt::NoFocus);
+    bar->setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+    bar->setStyleSheet(QStringLiteral(
+        "QScrollBar:vertical { background: #ddd; width: 42px; margin: 0; }"
+        "QScrollBar::handle:vertical { background: #555; min-height: 80px; }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"));
+    layout->addWidget(bar);
+    auto *source = area->verticalScrollBar();
+    QObject::connect(source, &QScrollBar::rangeChanged, bar, [bar, source](int min, int max) {
+        bar->setRange(min, max);
+        bar->setPageStep(source->pageStep());
+    });
+    QObject::connect(source, &QScrollBar::valueChanged, bar, &QScrollBar::setValue);
+    QObject::connect(bar, &QScrollBar::valueChanged, source, &QScrollBar::setValue);
+    bar->setRange(source->minimum(), source->maximum());
+    bar->setPageStep(source->pageStep());
+    bar->setValue(source->value());
+    return page;
 }
 
 static QCheckBox *nm_native_checkbox(QWidget *parent, const QString &text) {
@@ -531,6 +624,7 @@ static void nm_show_feature_settings() {
         nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Kobo's native settings view is unavailable on this firmware."));
         return;
     }
+    new NmSystemDialogGuard(view);
     auto *content = new QWidget(view);
     QFont uiFont = content->font();
     uiFont.setPixelSize(28);
@@ -542,7 +636,7 @@ static void nm_show_feature_settings() {
     tabs->tabBar()->setFocusPolicy(Qt::NoFocus);
     tabs->setStyleSheet(QStringLiteral(
         "QTabWidget::pane { border: 0; border-top: 1px solid #aaa; }"
-        "QTabBar::tab { border: 0; background: white; min-height: 58px; min-width: 180px; padding: 4px 12px; font-size: 25px; }"
+        "QTabBar::tab { border: 0; background: white; min-height: 58px; min-width: 150px; padding: 4px 8px; font-size: 25px; }"
         "QTabBar::tab:selected { border-bottom: 4px solid black; font-weight: bold; }"
         "QListWidget { border: 0; font-size: 30px; } QListWidget::item { min-height: 64px; }"
         "QListWidget::item:selected { background: #dedede; color: black; border-bottom: 2px solid black; }"));
@@ -550,6 +644,8 @@ static void nm_show_feature_settings() {
     auto *scroll = new QScrollArea(tabs);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    QScroller::grabGesture(scroll->viewport(), QScroller::TouchGesture);
     auto *featureList = new QWidget(scroll);
     auto *rows = new QVBoxLayout(featureList);
     rows->setSpacing(8);
@@ -567,7 +663,7 @@ static void nm_show_feature_settings() {
     }
     rows->addStretch();
     scroll->setWidget(featureList);
-    tabs->addTab(scroll, QStringLiteral("Features"));
+    tabs->addTab(nm_scroll_page(scroll, tabs), QStringLiteral("Permissions"));
     auto *menuPage = new QWidget(tabs);
     auto *menuLayout = new QVBoxLayout(menuPage);
     menuLayout->setContentsMargins(0, 0, 0, 0);
@@ -579,9 +675,69 @@ static void nm_show_feature_settings() {
     menuItems->setFocusPolicy(Qt::NoFocus);
     menuItems->setFont(uiFont);
     menuItems->setSpacing(8);
-    menuLayout->addWidget(menuItems);
+    menuItems->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    QScroller::grabGesture(menuItems->viewport(), QScroller::TouchGesture);
+    menuLayout->addWidget(nm_scroll_page(menuItems, menuPage));
     auto snapshots = QMap<QString, QByteArray>{};
     const bool editable = nm_read_ui_items(menuItems, &snapshots);
+    auto *quickScroll = new QScrollArea(tabs);
+    quickScroll->setFrameShape(QFrame::NoFrame);
+    quickScroll->setWidgetResizable(true);
+    quickScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    QScroller::grabGesture(quickScroll->viewport(), QScroller::TouchGesture);
+    auto *quickList = new QWidget(quickScroll);
+    auto *quickRows = new QVBoxLayout(quickList);
+    quickRows->setSpacing(8);
+    auto *quickTitle = new QLabel(QStringLiteral("Show in NickelMenu"), quickList);
+    quickTitle->setFont(uiFont);
+    quickRows->addWidget(quickTitle);
+    auto *quickHint = new QLabel(QStringLiteral("These switches add or remove ready-made menu items. Custom entries stay in Menu items."), quickList);
+    quickHint->setWordWrap(true);
+    quickHint->setFont(uiFont);
+    quickRows->addWidget(quickHint);
+    QList<QCheckBox *> quickBoxes;
+    for (const auto &shortcut : nm_shortcuts) {
+        auto *box = nm_native_checkbox(quickList, QLatin1String(shortcut.label));
+        box->setChecked(nm_managed_shortcut(menuItems, shortcut));
+        box->setEnabled(editable);
+        box->setFocusPolicy(Qt::NoFocus);
+        box->setMinimumHeight(70);
+        box->setFont(uiFont);
+        quickRows->addWidget(box);
+        quickBoxes << box;
+        QObject::connect(box, &QCheckBox::toggled, view, [menuItems, boxes, shortcut](bool checked) {
+            if (checked && !nm_managed_shortcut(menuItems, shortcut)) {
+                for (qsizetype i = 0; i < boxes.size(); ++i)
+                    if (!std::strcmp(nm_features[i].key, shortcut.permission)) boxes[i]->setChecked(true);
+                const QStringList fields{nm_ui_items_path, QStringLiteral("-1"), QStringLiteral("main"),
+                    QLatin1String(shortcut.label), QLatin1String(shortcut.action), QLatin1String(shortcut.argument)};
+                auto *item = new QListWidgetItem(nm_ui_item_text(fields));
+                item->setData(Qt::UserRole, fields);
+                menuItems->addItem(item);
+            } else if (!checked) {
+                if (auto *item = nm_managed_shortcut(menuItems, shortcut)) delete menuItems->takeItem(menuItems->row(item));
+            }
+        });
+    }
+    quickRows->addStretch();
+    quickScroll->setWidget(quickList);
+    tabs->insertTab(0, nm_scroll_page(quickScroll, tabs), QStringLiteral("Shortcuts"));
+    auto *permissionsTitle = new QLabel(QStringLiteral("Action permissions"), featureList);
+    permissionsTitle->setFont(uiFont);
+    rows->insertWidget(0, permissionsTitle);
+    auto *permissionsHint = new QLabel(QStringLiteral("These allow or block actions, including custom menu items. They do not add menu items."), featureList);
+    permissionsHint->setWordWrap(true);
+    permissionsHint->setFont(uiFont);
+    rows->insertWidget(1, permissionsHint);
+    auto refreshQuick = [menuItems, quickBoxes] {
+        for (qsizetype i = 0; i < quickBoxes.size(); ++i) {
+            const QSignalBlocker block(quickBoxes[i]);
+            quickBoxes[i]->setChecked(nm_managed_shortcut(menuItems, nm_shortcuts[i]));
+        }
+    };
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view, refreshQuick);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsRemoved, view, refreshQuick);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::dataChanged, view, refreshQuick);
     auto *menuButtons = new QVBoxLayout;
     auto *add = new QPushButton(QStringLiteral("Add menu item"), menuPage);
     auto *edit = new QPushButton(QStringLiteral("Edit selected"), menuPage);
@@ -603,7 +759,8 @@ static void nm_show_feature_settings() {
             edit->setEnabled(editable && item);
             remove->setEnabled(editable && item);
         });
-    tabs->addTab(menuPage, QStringLiteral("Menu items"));
+    tabs->insertTab(1, menuPage, QStringLiteral("Menu items"));
+    tabs->setCurrentIndex(0);
     QObject::connect(add, &QPushButton::clicked, view, [menuItems] { nm_edit_ui_item(menuItems, nullptr); });
     QObject::connect(edit, &QPushButton::clicked, view, [menuItems] {
         if (auto *item = menuItems->currentItem()) nm_edit_ui_item(menuItems, item);

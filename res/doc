@@ -15,8 +15,12 @@
 # slots. These checks do not prove private layout compatibility on new firmware.
 # On Qt6, the library creates this doc on user storage at first startup
 # without replacing existing files. Remove an explicit uninstall file before
-# reinstalling. The built-in NickelMenu Settings item opens feature switches;
-# all are enabled by default and saved in the hidden .features.ini file.
+# reinstalling. NickelMenu Settings has Shortcuts, Menu items, and Permissions.
+# Shortcuts add/remove ready-made menu items. Permissions gate action groups;
+# they default to enabled and are saved in the hidden .features.ini file.
+# The lists scroll and have vertical scrollbars on smaller screens.
+# The USB connection action is available for custom items, not a shortcut;
+# it changes Kobo's storage connection state.
 # Google Drive and Dropbox list entry, repeat entry, and provider switching
 # were checked on one N365 running 6.0.279225. A fresh Google Drive EPUB
 # downloaded and opened; other models and full library sync are unverified.

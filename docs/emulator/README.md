@@ -102,6 +102,16 @@ the native Discard changes confirmation on a tab switch. The 5.18 guest also
 showed that confirmation. Human-readable menu and action names appeared in the
 native selectors, with the original keys retained in config files.
 
+The three-tab Settings build was then run on both the 5.18.270971 and
+6.0.279225 guests. Shortcuts added Screenshot and Rotate screen to the Menu
+items list; Apply made them appear in NickelMenu without restarting Nickel.
+The final scrolling build shows an external, draggable vertical scrollbar on
+each list. On 5.18, a 30-item `reader` fixture in a temporary simulator config
+was scrolled to its final item. On both guests, the Permissions scrollbar
+reached Book rescan. In 6.0, a diagnostic dialog opened while Settings was
+visible; Settings yielded to the dialog and returned after OK. A physical USB
+prompt and touch flick still require hardware verification.
+
 The 5.18.270971 Kobo firmware image booted with the same Qt 6 `Kobo.tgz`
 build. On a fresh, sideloaded-mode onboard directory, the NickelMenu tab and
 Settings popup appeared. Saving **Dark mode** off wrote

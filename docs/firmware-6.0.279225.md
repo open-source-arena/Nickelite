@@ -78,6 +78,17 @@ underline, and aligns the editing controls with Apply changes. The revision
 passed visual checks in both simulator guests and awaits a physical touchscreen
 check.
 
+The next Settings candidate (`Kobo.tgz` SHA-256
+`03e9bc13a887f581de7667a187a689a8cad2a830f4e5fe196a62c2ef27d05322`)
+adds shortcut switches that create and remove menu
+entries, separate Sleep/Restart/Power off shortcuts, and scrollbars for all
+three Settings lists. It removes USB connection from the suggested shortcuts;
+the action remains available for custom menu items. A native modal dialog now
+temporarily displaces Settings and Settings returns after it closes. The
+6.0.279225 simulator verified that dialog behavior and the draggable scrollbar;
+the 5.18.270971 simulator reached the end of a temporary 30-item Menu items
+list. Physical installation and USB prompt verification are pending.
+
 To recreate the guest, follow [real-cloud.md](emulator/real-cloud.md) with
 `NM_FIRMWARE_VERSION=6.0.279225`. Keep the work directory outside Git because
 its `onboard` subdirectory contains account tokens. The rebuilt VNC platform

@@ -64,9 +64,12 @@ created there on first startup if missing. Create a separate text file such as
 `.adds/nm/uninstall` and reboot. The plugin's startup failsafe remains enabled.
 See [the configuration documentation](res/doc) to add menu entries. Errors are
 shown in the menu when possible; startup errors appear in `logread` over SSH.
-The built-in **NickelMenu Settings** item controls supported action groups on
-Qt 6. Its switches default to on and are saved in `.adds/nm/.features.ini`;
-deleting that hidden file restores defaults. Its **Menu items** tab reads the
+The built-in **NickelMenu Settings** view has **Shortcuts**, **Menu items**, and
+**Permissions** tabs. Shortcut switches add or remove ready-made menu items for
+dark mode, screenshots, rotation, cloud services, Wi-Fi, and separate power
+actions. Permissions allow or block action groups, including custom items; they
+default to on and are saved in `.adds/nm/.features.ini`. Deleting that hidden
+file restores defaults. The **Menu items** tab reads the
 existing `.adds/nm` files. You can add, edit or remove a menu item there;
 changes made in a text editor appear when you reopen Settings. New items go
 to `zz-nm-settings.conf`. Editing an item keeps its chained actions, while
@@ -76,7 +79,10 @@ changed while the Settings view was open. The view fills the page above Kobo's
 bottom navigation, shows readable menu and action names, and highlights the
 NickelMenu tab while open. Back or another bottom tab asks before discarding
 unsaved changes, including changes in the item editor. Its text fields use
-Kobo's on-screen keyboard. Back up `.adds/nm` before
+Kobo's on-screen keyboard. All three lists scroll on smaller screens and show
+a vertical scrollbar. System dialogs can appear above Settings. The USB
+connection action remains available as a custom menu item; it is not a
+ready-made shortcut because it changes Kobo's storage connection state. Back up `.adds/nm` before
 substantial edits. See the
 [v0.6.0 feature matrix](docs/feature-matrix.md) for coverage and limits.
 
