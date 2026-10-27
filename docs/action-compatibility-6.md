@@ -27,6 +27,15 @@ This verifies the previously failing repeat and provider-switch paths on this
 device and firmware, plus one file transfer from each provider. Full library
 sync and other Kobo models or firmware versions remain unverified.
 
+The owner also reported that swiping within a long Google Drive file list
+opens the touched row. The same behavior occurs through Kobo's stock
+More → My Google Drive entry, so it is not specific to NickelMenu's cloud
+shortcut. The networked QEMU guest reproduced the row opening on a drag;
+the native list's narrow right-side down and up arrows paged through the
+items and back. Use those arrows to browse long lists on this firmware.
+Swipe scrolling of this native view remains unsupported by the tested build;
+no touch-event patch was installed for this behavior.
+
 ## Earlier physical checkpoints
 
 Physical actions were performed on the previously installed build, identified
