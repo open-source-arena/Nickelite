@@ -32,7 +32,10 @@ NickelMenu returned on Home. Google Drive opened twice from Home; Google Drive
 → Dropbox → Google Drive switching also opened each linked file list and
 remained responsive for 30 seconds. A Google Drive swipe still opened the
 touched item instead of scrolling, matching the earlier firmware's list
-behavior. A new-firmware file download remains pending.
+behavior. The narrow up/down arrows at the list's right edge page through
+items and work on this firmware. A fresh Google Drive EPUB named
+`000-NickelMenuNG-6.0.279225-20261027.epub` downloaded and opened in My Books
+with its `PECAN` marker. Dropbox transfer on this firmware remains pending.
 
 To recreate the guest, follow [real-cloud.md](emulator/real-cloud.md) with
 `NM_FIRMWARE_VERSION=6.0.279225`. Keep the work directory outside Git because
