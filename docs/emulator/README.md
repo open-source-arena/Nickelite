@@ -8,16 +8,14 @@ booted Kobo board. See [action results](../action-compatibility-6.md) and
 
 ## What a fresh clone provides
 
-This repository includes the production SDK builder, an emulator-only VNC
-backend patch script, and a guest startup wrapper. **It does not include a
-simulator Dockerfile/image builder or a prepared firmware rootfs.** The original
-container, mounted storage and browser tools were local session artifacts under
-`/tmp/nickelmenu-emulator`; a host reboot may remove those files. There is no
-fresh-clone simulator launch command yet. The commands below reuse an already
-prepared guest and describe the missing prerequisites without assuming that the
-original host cache is available.
+This repository includes the SDK builder, emulator-only VNC patch, guest
+startup wrapper and an image builder that downloads and verifies the pinned
+official firmware. It does not include Kobo firmware, a prepared image or
+account data. For a fresh-clone, outbound-network guest with cloud linking,
+follow [real-cloud.md](real-cloud.md). The commands below also document the
+older offline guest and manual plugin installation.
 
-To recreate the guest, an integrator must supply:
+For the older offline guest, an integrator must supply:
 
 - Linux with Docker and an extracted, locally obtained 6.0.274403 rootfs, including
   Nickel, Qt libraries/plugins, its ARM loader/libc, fonts and runtime resources.
@@ -33,9 +31,9 @@ To recreate the guest, an integrator must supply:
   Use a dedicated tmpfs-backed user-storage mount at `/mnt/onboard`: Docker
   overlay inode numbers exceeded ARM32 `dirent` limits in the original test.
 - A minimal `/emulator-offline.conf` with `[ApplicationPreferences]`,
-  `CurrentLocale=en_US` and `SideloadedMode=true`. Do not copy real credentials or
-  an account database. Mount writable scratch user storage separately from the
-  image, so it survives container restarts.
+  `CurrentLocale=en_US` and `SideloadedMode=true`. The real-network builder
+  instead uses `SideloadedMode=false` for account setup. Mount writable scratch
+  user storage separately from the image, so it survives container restarts.
 - Product environment `PRODUCT=spaKoboBW`, `PLATFORM=MT8113T-ntx`,
   `NICKEL_HOME=/mnt/onboard/.kobo`, `LD_LIBRARY_PATH=/usr/local/Kobo`, and
   `QTWEBENGINE_DISABLE_SANDBOX=1`. The original environment also used
@@ -44,8 +42,9 @@ To recreate the guest, an integrator must supply:
   `QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox --no-zygote --single-process --disable-gpu`.
   Those Chromium flags were confined to the isolated offline guest.
 
-The battery mount layout, rootfs assembly and image/container creation steps are
-not automated here. Set the working directory to `/usr/local/Kobo` and install
+The older battery mount layout, rootfs assembly and image/container creation
+steps were manual; [the real-network scripts](real-cloud.md) now automate their
+equivalents. Set the working directory to `/usr/local/Kobo` and install
 [start-guest.sh](start-guest.sh) as `/emulator-start.sh`; the original entrypoint
 was `/qemu-arm-static /bin/sh /emulator-start.sh`. That wrapper expects the
 firmware's `/bin` and `/sbin` tools and creates the offline preferences only when
@@ -132,12 +131,13 @@ from publication. Their summary and the later cloud panic report are in
 [action compatibility](../action-compatibility-6.md). A freshly rebuilt
 plugin has not automatically inherited those historical runtime results.
 
-Wi-Fi, RTC, framebuffer ioctls, e-ink updates, suspend, power and USB hardware are
+Wi-Fi radio, RTC, framebuffer ioctls, e-ink updates, suspend, power and USB hardware are
 not modeled. In an isolated offline guest, the Qt6 source candidate opened Google Drive
 to a blank content area, Escape returned to Books, and a second entry opened the same
 blank area. The Nickel process remained running after the second entry, and the VNC test
 command completed successfully. This does not model the network or service
 state that may trigger the physical candidate
 repeat-open panic/restart. The emulator did not test service listing, login,
-downloads or sync. See
+downloads or sync. The later real-network guest results are in
+[real-cloud.md](real-cloud.md). See
 [the compatibility report](../action-compatibility-6.md) for the current status.

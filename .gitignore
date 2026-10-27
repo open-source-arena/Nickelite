@@ -31,3 +31,4 @@ test.syms
 /test/compat
 /test/compat.d
 /src/install.o
+/docs/emulator/libqvnc-repaint.so

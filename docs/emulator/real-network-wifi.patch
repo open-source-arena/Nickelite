@@ -1,0 +1,91 @@
+--- a/src/nickelmenu.cc
++++ b/src/nickelmenu.cc
+@@ -9,0 +10,2 @@
++#include <QNetworkProxy>
++#include <QSslSocket>
+@@ -17,0 +20,4 @@
++#include <cstdint>
++#include <dlfcn.h>
++#include <sys/mman.h>
++#include <unistd.h>
+@@ -111,0 +118,3 @@
++static bool (*WirelessManager_connected)(void *) = nullptr;
++static bool nm_qemu_wifi_connected = false;
++static bool nm_qemu_official_network_ready = false;
+@@ -168,0 +178,54 @@
++
++static bool nm_probe_official_kobo_tls() {
++    QSslSocket socket;
++    socket.setProxy(QNetworkProxy::NoProxy);
++    socket.setPeerVerifyMode(QSslSocket::VerifyPeer);
++    socket.connectToHostEncrypted(QStringLiteral("www.kobo.com"), 443);
++    const bool verified = socket.waitForEncrypted(3000) && socket.isEncrypted();
++    socket.abort();
++    return verified;
++}
++
++extern "C" __attribute__((visibility("default"))) bool _nm_qemu_real_internet_accessible(void *) {
++    return nm_qemu_official_network_ready;
++}
++
++static bool nm_qemu_patch_internet_gate() {
++    using SharedInstance = void *(*)();
++    auto sharedInstance = reinterpret_cast<SharedInstance>(
++        dlsym(RTLD_DEFAULT, "_ZN23WirelessWorkflowManager14sharedInstanceEv"));
++    void *manager = sharedInstance ? sharedInstance() : nullptr;
++    if (!manager) return false;
++
++    auto **vtable = *reinterpret_cast<void ***>(manager);
++    if (!vtable || !vtable[12]) return false;
++    auto *slot = &vtable[12];
++    const long pageSize = sysconf(_SC_PAGESIZE);
++    if (pageSize <= 0) return false;
++    const uintptr_t page = reinterpret_cast<uintptr_t>(slot) & ~uintptr_t(pageSize - 1);
++    if (mprotect(reinterpret_cast<void *>(page), pageSize, PROT_READ | PROT_WRITE) != 0)
++        return false;
++
++    void *original = *slot;
++    *slot = reinterpret_cast<void *>(&_nm_qemu_real_internet_accessible);
++    if (mprotect(reinterpret_cast<void *>(page), pageSize, PROT_READ) == 0)
++        return true;
++
++    *slot = original;
++    const bool protectionRestored = mprotect(reinterpret_cast<void *>(page), pageSize, PROT_READ) == 0;
++    NM_LOG("emulator network gate: restored original method after protection failure (%s)",
++        protectionRestored ? "read-only" : "original pointer; protection restore failed");
++    return false;
++}
++
++extern "C" __attribute__((visibility("default"))) bool _nm_qemu_wireless_connected(void *manager) {
++    static bool logged = false;
++    if (nm_qemu_wifi_connected) {
++        if (!logged) {
++            NM_LOG("emulator-only Wi-Fi state shim active; native DNS and TLS remain unchanged");
++            logged = true;
++        }
++        return true;
++    }
++    return WirelessManager_connected && WirelessManager_connected(manager);
++}
+@@ -186,0 +250 @@
++    {.sym = "_ZN15WirelessManager9connectedEv", .sym_new = "_nm_qemu_wireless_connected", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(WirelessManager_connected), .desc = "isolated QEMU Wi-Fi state compatibility", .optional = true},
+@@ -284,0 +349,15 @@
++    const char *emulatorWifi = std::getenv("NM_QEMU_WIFI_CONNECTED");
++    const bool requested = nm_exact_n365_firmware && emulatorWifi
++        && !std::strcmp(emulatorWifi, "1");
++    if (requested) {
++        const bool tlsVerified = nm_probe_official_kobo_tls();
++        NM_LOG("emulator official Kobo TLS probe: %s",
++            tlsVerified ? "verified" : "failed; native Wi-Fi scan remains");
++        const bool gateInstalled = tlsVerified && nm_qemu_patch_internet_gate();
++        NM_LOG("emulator network gate: %s",
++            gateInstalled ? "official TLS gate installed" : "not installed; native Wi-Fi scan remains");
++        nm_qemu_official_network_ready = gateInstalled;
++        nm_qemu_wifi_connected = gateInstalled;
++    }
++    NM_LOG("emulator Wi-Fi state shim: %s",
++        nm_qemu_wifi_connected ? "exact firmware and official TLS verified" : "disabled");
+--- a/Makefile
++++ b/Makefile
+@@ -11,0 +12 @@
++override PKGCONF += Qt6Network
