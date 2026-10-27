@@ -3,6 +3,8 @@
 #include "../src/util.h"
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QCoreApplication>
+#include <QTemporaryFile>
 #include <cassert>
 #include <cstring>
 
@@ -13,18 +15,66 @@ extern "C" bool nh_delete_dir(const char *) { std::abort(); }
 static MainNavView *expected_view;
 static QWidget *expected_parent;
 static unsigned constructor_calls;
+static const void *n365_device = reinterpret_cast<const void *>(uintptr_t(0x4000));
+static bool original_dropbox_support;
+static bool original_gdrive_support;
+static bool test_model_support(const void *device) { return device == n365_device; }
+static bool test_original_dropbox_support(const void *) { return original_dropbox_support; }
+static bool test_original_gdrive_support(const void *) { return original_gdrive_support; }
 static MainNavView *original_constructor(MainNavView *view, QWidget *parent) {
     assert(view == expected_view && parent == expected_parent);
     ++constructor_calls;
     return reinterpret_cast<MainNavView *>(uintptr_t(0x3000));
 }
 
-int main() {
+int main(int argc, char **argv) {
+    QCoreApplication app(argc, argv);
+    unsigned child_creations = 0;
+    bool type_mismatch = false;
+    const QString child_name = QStringLiteral("nmTestController");
+    auto create_child = [&]() -> QObject * { ++child_creations; return new QObject; };
+    QObject *child = nm_application_owned_child(&app, child_name, "QObject", create_child, &type_mismatch);
+    assert(child && child->parent() == &app && child->objectName() == child_name && !type_mismatch);
+    assert(nm_application_owned_child(&app, child_name, "QObject", create_child, &type_mismatch) == child);
+    assert(child_creations == 1 && !type_mismatch);
+    delete child;
+    QObject *replacement = nm_application_owned_child(&app, child_name, "QObject", create_child, &type_mismatch);
+    assert(replacement && replacement->parent() == &app && child_creations == 2);
+    assert(!nm_application_owned_child(&app, child_name, "QWidget", create_child, &type_mismatch));
+    assert(type_mismatch && child_creations == 2);
+    delete replacement;
+
+#if NM_QT_MAJOR >= 6
+    Device_isSpaKoboBW = test_model_support;
+    Device_supportsDropbox = test_original_dropbox_support;
+    Device_supportsGoogleDrive = test_original_gdrive_support;
+
+    nm_exact_n365_firmware = false;
+    assert(!_nm_device_supports_dropbox(n365_device));
+    assert(!_nm_device_supports_google_drive(n365_device));
+
+    nm_exact_n365_firmware = true;
+    const void *other_device = reinterpret_cast<const void *>(uintptr_t(0x5000));
+    assert(!_nm_device_supports_dropbox(other_device));
+    assert(!_nm_device_supports_google_drive(other_device));
+    assert(_nm_device_supports_dropbox(n365_device));
+    assert(_nm_device_supports_google_drive(n365_device));
+
+    original_dropbox_support = true;
+    original_gdrive_support = true;
+    assert(_nm_device_supports_dropbox(other_device));
+    assert(_nm_device_supports_google_drive(other_device));
+    nm_exact_n365_firmware = false;
+
+#endif
+
     for (const char *provider : {"dropbox", "gdrive"}) {
         const QString arg = QStringLiteral("library:") + provider;
         assert(!nm_action_nickel_open(arg.toUtf8().constData()));
         const char *error = nm_err_peek();
-        const char *expected = "Dropbox and Google Drive actions are disabled on Qt 6 firmware after a reported device panic";
+        const char *expected = !std::strcmp(provider, "dropbox")
+            ? "could not dlsym MoreController::dropbox"
+            : "could not dlsym MoreController::gdrive";
         assert(error && !std::strncmp(error, expected, std::strlen(expected)));
         nm_err_set(nullptr);
     }
@@ -57,4 +107,33 @@ int main() {
     const auto json = QJsonDocument::fromJson(result);
     assert(!json.isNull() && json.object().value(QStringLiteral("value")).toString() == controls);
     free(result);
+
+#if NM_QT_MAJOR >= 6
+    if (dlopen("libnickel.so.1.0.0", RTLD_LAZY | RTLD_GLOBAL)) {
+        assert(nm_is_exact_target_firmware());
+        void *deviceAddress = dlsym(RTLD_DEFAULT, "_ZN6Device16getCurrentDeviceEv");
+        Dl_info info{};
+        assert(deviceAddress && dladdr(deviceAddress, &info) && info.dli_fname);
+        QFile firmware(QString::fromLocal8Bit(info.dli_fname));
+        assert(firmware.open(QIODevice::ReadOnly));
+        assert(nm_hash_exact_target_libnickel(firmware));
+        const auto enabled = QByteArray::fromHex("00b5012000bd");
+
+        QTemporaryFile patchedFirmware;
+        assert(patchedFirmware.open() && firmware.seek(0));
+        while (!firmware.atEnd()) {
+            const QByteArray chunk = firmware.read(16 * 1024);
+            assert(!chunk.isEmpty() && patchedFirmware.write(chunk) == chunk.size());
+        }
+        assert(patchedFirmware.seek(0x00f5b9b4));
+        assert(patchedFirmware.write(enabled) == enabled.size());
+        assert(patchedFirmware.seek(0x00f5b9e4));
+        assert(patchedFirmware.write(enabled) == enabled.size());
+        assert(patchedFirmware.flush() && nm_hash_exact_target_libnickel(patchedFirmware));
+        assert(patchedFirmware.seek(0));
+        const char changed = static_cast<char>(patchedFirmware.read(1).at(0) ^ 1);
+        assert(patchedFirmware.seek(0) && patchedFirmware.write(&changed, 1) == 1);
+        assert(patchedFirmware.flush() && !nm_hash_exact_target_libnickel(patchedFirmware));
+    }
+#endif
 }

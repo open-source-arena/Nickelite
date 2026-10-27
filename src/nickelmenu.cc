@@ -1,6 +1,8 @@
 #include <QAction>
 #include <QApplication>
+#include <QByteArrayView>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QFile>
 #include <QLayout>
 #include <QMenu>
@@ -102,6 +104,70 @@ void (*SelectionMenuController_addMenuItem)(SelectionMenuController*, SelectionM
 void (*SelectionMenuView_addMenuItem)(SelectionMenuView*, MenuTextItem *mti); // note: this adds the separator and the item (it doesn't connect signals or things like that)
 void (*WebSearchMixinBase_doWikipediaSearch)(WebSearchMixinBase *, QString const& selection, QString const& locale);
 
+#if NM_QT_MAJOR >= 6
+static bool (*Device_supportsDropbox)(const void *) = nullptr;
+static bool (*Device_supportsGoogleDrive)(const void *) = nullptr;
+static bool (*Device_isSpaKoboBW)(const void *) = nullptr;
+static bool nm_exact_n365_firmware = false;
+
+static bool nm_hash_exact_target_libnickel(QFile &library) {
+    constexpr qint64 dropboxOffset = 0x00f5b9b4;
+    constexpr qint64 googleDriveOffset = 0x00f5b9e4;
+    constexpr qint64 methodSize = 6;
+    static const auto original = QByteArray::fromHex("10b501210446");
+    static const auto enabled = QByteArray::fromHex("00b5012000bd");
+    if (library.size() <= googleDriveOffset + methodSize) return false;
+
+    if (!library.seek(dropboxOffset)) return false;
+    const auto dropboxBytes = library.read(methodSize);
+    if (!library.seek(googleDriveOffset)) return false;
+    const auto googleDriveBytes = library.read(methodSize);
+    const bool patched = dropboxBytes == enabled && googleDriveBytes == enabled;
+    if (!patched && (dropboxBytes != original || googleDriveBytes != original)) return false;
+    if (!library.seek(0)) return false;
+
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    char buffer[16 * 1024];
+    qint64 position = 0;
+    while (true) {
+        const qint64 count = library.read(buffer, sizeof(buffer));
+        if (count < 0) return false;
+        if (!count) break;
+        if (patched) {
+            const qint64 ranges[] = {dropboxOffset, googleDriveOffset};
+            for (const qint64 start : ranges) {
+                const qint64 from = qMax(position, start);
+                const qint64 to = qMin(position + count, start + methodSize);
+                if (from < to)
+                    std::memcpy(buffer + (from - position), original.constData() + (from - start), to - from);
+            }
+        }
+        hash.addData(QByteArrayView(buffer, count));
+        position += count;
+    }
+    return hash.result().toHex()
+        == QByteArrayLiteral("b22059eb126d355312f69abb9d1cafc72f0cf54ed4ffe5607eadda2d65670df7");
+}
+
+static bool nm_is_exact_target_firmware() {
+    void *address = dlsym(RTLD_DEFAULT, "_ZN6Device16getCurrentDeviceEv");
+    Dl_info info{};
+    if (!address || !dladdr(address, &info) || !info.dli_fname) return false;
+    QFile library(QString::fromLocal8Bit(info.dli_fname));
+    return library.open(QIODevice::ReadOnly) && nm_hash_exact_target_libnickel(library);
+}
+
+extern "C" __attribute__((visibility("default"))) bool _nm_device_supports_dropbox(const void *device) {
+    if (nm_exact_n365_firmware && Device_isSpaKoboBW && Device_isSpaKoboBW(device)) return true;
+    return Device_supportsDropbox && Device_supportsDropbox(device);
+}
+
+extern "C" __attribute__((visibility("default"))) bool _nm_device_supports_google_drive(const void *device) {
+    if (nm_exact_n365_firmware && Device_isSpaKoboBW && Device_isSpaKoboBW(device)) return true;
+    return Device_supportsGoogleDrive && Device_supportsGoogleDrive(device);
+}
+#endif
+
 static struct nh_info NickelMenu = (struct nh_info){
     .name            = "NickelMenu",
     .desc            = "Integrated launcher for Nickel.",
@@ -115,6 +181,10 @@ static struct nh_info NickelMenu = (struct nh_info){
 };
 
 static struct nh_hook NickelMenuHook[] = {
+#if NM_QT_MAJOR >= 6
+    {.sym = "_ZNK6Device15supportsDropboxEv", .sym_new = "_nm_device_supports_dropbox", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(Device_supportsDropbox), .desc = "N365 Qt6 cloud capability compatibility", .optional = true},
+    {.sym = "_ZNK6Device19supportsGoogleDriveEv", .sym_new = "_nm_device_supports_google_drive", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(Device_supportsGoogleDrive), .desc = "N365 Qt6 cloud capability compatibility", .optional = true},
+#endif
     {.sym = "_ZN23SelectionMenuController18setupSearchOptionsEb", .sym_new = "_nm_selection_search", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(SelectionMenuController_setupSearchOptions), .desc = nullptr, .optional = true}, //libnickel 6.0 * _ZN23SelectionMenuController18setupSearchOptionsEb
     // menu injection
     {.sym = "_ZN28AbstractNickelMenuController18createMenuTextItemEP5QMenuRK7QStringbbS4_", .sym_new = "_nm_menu_hook", .lib = "libnickel.so.1.0.0", .out = nh_symoutptr(AbstractNickelMenuController_createMenuTextItem), .desc = nullptr, .optional = true}, //libnickel 4.6 * _ZN28AbstractNickelMenuController18createMenuTextItemEP5QMenuRK7QStringbbS4_
@@ -131,6 +201,9 @@ static struct nh_hook NickelMenuHook[] = {
 };
 
 static struct nh_dlsym NickelMenuDlsym[] = {
+#if NM_QT_MAJOR >= 6
+    {.name = "_ZNK6Device11isSpaKoboBWEv", .out = nh_symoutptr(Device_isSpaKoboBW), .desc = "N365 Qt6 cloud capability compatibility", .optional = true},
+#endif
     {.name = "_ZN23SelectionMenuController14clearSelectionEv", .out = nh_symoutptr(SelectionMenuController_clearSelection), .desc = nullptr, .optional = true}, //libnickel 6.0 * _ZN23SelectionMenuController14clearSelectionEv
     {.name = "_ZN23SelectionMenuController5closeEv", .out = nh_symoutptr(SelectionMenuController_close), .desc = nullptr, .optional = true}, //libnickel 6.0 * _ZN23SelectionMenuController5closeEv
     {.name = "_ZN15PageImageReader12selectedTextEv", .out = nh_symoutptr(PageImageReader_selectedText), .desc = nullptr, .optional = true}, //libnickel 6.0 * _ZN15PageImageReader12selectedTextEv
@@ -204,6 +277,12 @@ static void nm_show_dialog(QString const &title, QString const &body) {
 }
 
 static int nm_init() {
+#if NM_QT_MAJOR >= 6
+    nm_exact_n365_firmware = nm_is_exact_target_firmware();
+    NM_LOG("cloud capability compatibility: %s", nm_exact_n365_firmware
+        ? "target firmware recognized; N365 model check remains active"
+        : "target firmware not recognized; native model gates unchanged");
+#endif
     // Each menu and output feature checks its own dependencies before use.
     for (auto *symbol = NickelMenuDlsym; symbol->name; ++symbol) {
         auto *code = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(*symbol->out) & ~uintptr_t(1));

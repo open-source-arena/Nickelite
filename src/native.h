@@ -2,12 +2,38 @@
 
 #include <QMetaType>
 #include <QByteArray>
+#include <QCoreApplication>
 #include <QObject>
+#include <QString>
 #include <cstddef>
 #include <cstring>
 #include <dlfcn.h>
 #include <link.h>
 #include <new>
+
+template <typename Factory>
+inline QObject *nm_application_owned_child(QCoreApplication *app, const QString &name,
+        const char *className, Factory create, bool *typeMismatch = nullptr) {
+    if (typeMismatch) *typeMismatch = false;
+    if (!app) return nullptr;
+    if (auto *existing = app->findChild<QObject *>(name, Qt::FindDirectChildrenOnly)) {
+        if (!existing->inherits(className)) {
+            if (typeMismatch) *typeMismatch = true;
+            return nullptr;
+        }
+        return existing;
+    }
+    auto *object = create();
+    if (!object) return nullptr;
+    if (!object->inherits(className)) {
+        delete object;
+        if (typeMismatch) *typeMismatch = true;
+        return nullptr;
+    }
+    object->setObjectName(name);
+    object->setParent(app);
+    return object;
+}
 
 // Inspect ELF mappings before reading private firmware metadata. A symbol's
 // presence alone does not establish that the required bytes are accessible.

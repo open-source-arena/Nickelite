@@ -137,10 +137,44 @@ NM_ACTION_(nickel_open) {
     if ((!strcmp(arg1, "library") && !strcmp(arg2, "pocket")) ||
         (!strcmp(arg1, "reading_life") && !strcmp(arg2, "awards")))
         NM_ERR_RET(nullptr, "nickel_open view '%s:%s' is not supported on Qt 6 firmware", arg1, arg2);
+#endif
 
+#if NM_QT_MAJOR >= 6
     if (!strcmp(arg1, "library") && (!strcmp(arg2, "dropbox") || !strcmp(arg2, "gdrive"))) {
-        NM_ERR_RET(nullptr,
-            "Dropbox and Google Drive actions are disabled on Qt 6 firmware after a reported device panic");
+        auto *app = QCoreApplication::instance();
+        NM_CHECK(nullptr, app, "Qt application unavailable for cloud navigation");
+
+        void (*open)(MoreController *);
+        if (!strcmp(arg2, "dropbox")) {
+            //libnickel 4.23.15505 * _ZN14MoreController7dropboxEv
+            NM_ACT_XSYM(open, "_ZN14MoreController7dropboxEv", "could not dlsym MoreController::dropbox");
+        } else {
+            //libnickel 4.36.21095 * _ZN14MoreController11googleDriveEv
+            NM_ACT_XSYM(open, "_ZN14MoreController11googleDriveEv", "could not dlsym MoreController::gdrive");
+        }
+
+        // The native controller applies the provider capability gates before
+        // opening either asynchronous workflow. Keep it parented to the app so
+        // callbacks do not outlive a temporary controller.
+        static const auto objectName = QStringLiteral("nmQt6MoreController");
+        bool typeMismatch = false;
+        QObject *object = nm_application_owned_child(app, objectName, "MoreController", [&]() -> QObject * {
+            MoreController *(*construct)(MoreController *);
+            NM_ACT_XSYM(construct, "_ZN14MoreControllerC1Ev", "could not dlsym MoreController::MoreController");
+            auto *storage = reinterpret_cast<MoreController *>(nm_native_storage("MoreController", 128));
+            NM_CHECK(nullptr, storage, "native MoreController size unavailable");
+            auto *controller = construct(storage);
+            NM_CHECK(nullptr, controller, "MoreController::MoreController returned null pointer");
+            return reinterpret_cast<QObject *>(controller);
+        }, &typeMismatch);
+        NM_CHECK(nullptr, !typeMismatch, "unexpected cloud controller object");
+        NM_CHECK(nullptr, object, "native MoreController unavailable");
+
+        const bool dropbox = !strcmp(arg2, "dropbox");
+        NM_LOG("Qt6 cloud route: invoking native %s MoreController gate", dropbox ? "Dropbox" : "Google Drive");
+        open(reinterpret_cast<MoreController *>(object));
+        NM_LOG("Qt6 cloud route: native %s MoreController method returned", dropbox ? "Dropbox" : "Google Drive");
+        return nm_action_result_silent();
     }
 #endif
 

@@ -133,6 +133,11 @@ from publication. Their summary and the later cloud panic report are in
 plugin has not automatically inherited those historical runtime results.
 
 Wi-Fi, RTC, framebuffer ioctls, e-ink updates, suspend, power and USB hardware are
-not modeled. The Qt6 cloud actions are currently disabled after an owner-reported
-physical panic. This setup cannot validate login, downloads, sync or the panic
-containment on a Kobo reader.
+not modeled. In an isolated offline guest, the Qt6 source candidate opened Google Drive
+to a blank content area, Escape returned to Books, and a second entry opened the same
+blank area. The Nickel process remained running after the second entry, and the VNC test
+command completed successfully. This does not model the network or service
+state that may trigger the physical candidate
+repeat-open panic/restart. The emulator did not test service listing, login,
+downloads or sync. See
+[the compatibility report](../action-compatibility-6.md) for the current status.

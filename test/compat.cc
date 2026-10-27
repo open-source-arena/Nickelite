@@ -13,6 +13,11 @@ int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
     assert(dlopen("libnickel.so.1.0.0", RTLD_LAZY | RTLD_GLOBAL));
     for (const auto &entry : nm_abi_functions) assert(nm_resolve(entry.name));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    assert(nm_resolve("_ZNK6Device15supportsDropboxEv"));
+    assert(nm_resolve("_ZNK6Device19supportsGoogleDriveEv"));
+    assert(nm_resolve("_ZNK6Device11isSpaKoboBWEv"));
+#endif
     const char *error = nullptr;
     assert(!nm_resolve("_missing_nickel_symbol", &error));
     assert(!std::strcmp(error, "symbol missing"));

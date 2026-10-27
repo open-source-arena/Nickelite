@@ -13,10 +13,13 @@
 # slots. These checks do not prove private layout compatibility on new firmware.
 # On Qt6, the library creates this doc on user storage at first startup
 # without replacing existing files. Remove an explicit uninstall file before
-# reinstalling. The owner first reported Dropbox and Google Drive linking/listing,
-# then later reported that using both services caused the reader to panic. Qt6
-# cloud actions are disabled in this source. Do not use actions from an older
-# build. Once the reader returns to a normal screen, update only through stock USB.
+# reinstalling. A Qt6 cloud source candidate routed through Kobo's native
+# provider gates and retained MoreController for the application lifetime. It was
+# tested on one N365: the first Google Drive entry opened its list, but a second
+# entry and a post-restart entry caused panic/restarts. It has been rolled back.
+# Do not invoke either cloud action. The c980d6c containment build is active, and
+# the reader is responsive; its Dropbox disabled message was confirmed earlier. Use only
+# stock USB installation; do not infer safety on another model or firmware.
 # USB disconnect can leave a stale Connected screen; a short normal power press restored the GUI.
 #
 # Place your configuration files in this folder. They can be named anything, and
@@ -136,8 +139,8 @@
 #                                          library:shelves           - Collections
 #                                          library:pocket            - Articles (until 4.38.23171/4.42.23296)
 #                                          library:instapaper        - Instapaper (4.43.23418+)
-#                                          library:dropbox           - Dropbox (4.18.13737+); disabled on Qt6
-#                                          library:gdrive            - GoogleDrive (4.36.21095+); disabled on Qt6
+#                                          library:dropbox           - Dropbox (4.18.13737+); old Qt6 build crashed; a46 not tested
+#                                          library:gdrive            - GoogleDrive (4.36.21095+); old Qt6 build crashed; a46 repeat-open panic
 #                                          reading_life:reading_life - Activity (with last tab)
 #                                          reading_life:stats        - Activity
 #                                          reading_life:awards       - Awards

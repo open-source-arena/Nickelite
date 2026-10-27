@@ -11,15 +11,23 @@ target. It reuses [Nico Verbruggen's Qt 6 port](https://github.com/nicoverbrugge
 on top of [upstream NickelMenu](https://github.com/pgaskin/NickelMenu/tree/bc799ebe95a413a4857aa97a88e2b16557e6427f),
 and vendors its [NickelHook dependency](https://github.com/nicoverbruggen/NickelHook/tree/03abed0c8e6226c1fca75906b7906d5d11664055),
 with a local fix to restore GOT page protection after hooking or rollback.
-The original MIT license and authorship apply. This is an unofficial development
-build, tested locally against that exact firmware and on one Clara BW (N365).
-The owner first reported successful Dropbox and Google Drive linking and file
-listing, then reported that using both cloud services caused the physical reader
-to panic. The cause and exact failure stage are unknown. **Qt6 Dropbox and Google
-Drive actions are disabled in this source. Do not invoke cloud actions from an
-older installed build.** Once the reader is back at a normal screen, update only
-through the stock USB installation path described below; do not sign out, reset,
-or use firmware recovery. See [the compatibility results](docs/action-compatibility-6.md).
+The original MIT license and authorship apply. This is an unofficial development build. The experimental source candidate
+builds against the exact firmware libraries. Its a46 package was installed on
+the physical N365 using `.kobo/Kobo.tgz`; USB hash and archive consumption were
+confirmed. Google Drive opened once, then panicked/restarted on reentry and again
+after restart. It was rolled back to c980d6c containment. The current source still
+contains the failed experimental cloud route; do not build or install it as a
+release. The reader is responsive on containment.
+Earlier physical Dropbox/Google Drive checks and subsequent crashes occurred on
+the older installed build identified by its `5955649c` marker. Dropbox's fixture
+initially downloaded/opened, but later Google Drive and Dropbox selections
+caused panic/restarts. The newer source candidate archive was first staged
+under the wrong filename and was not installed, then correctly installed as
+`.kobo/Kobo.tgz`. The c980d6c containment rollback was applied in between; its
+Dropbox disabled message was verified with the reader responsive. The candidate returned to responsive Home after update, then failed on Google
+Drive reentry. Do not open either cloud action. Do not sign out, reset, or use
+firmware recovery. See [the
+compatibility results](docs/action-compatibility-6.md).
 A successful build or symbol check does not establish compatibility with other
 6.x releases or devices.
 
