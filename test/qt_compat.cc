@@ -120,7 +120,9 @@ int main(int argc, char **argv) {
 
 #if NM_QT_MAJOR >= 6
     if (dlopen("libnickel.so.1.0.0", RTLD_LAZY | RTLD_GLOBAL)) {
-        assert(nm_is_exact_target_firmware());
+        const bool supported = !qEnvironmentVariableIsSet("NM_TEST_UNSUPPORTED_FIRMWARE");
+        assert(nm_is_exact_target_firmware() == supported);
+        if (!supported) return 0;
         void *deviceAddress = dlsym(RTLD_DEFAULT, "_ZN6Device16getCurrentDeviceEv");
         Dl_info info{};
         assert(deviceAddress && dladdr(deviceAddress, &info) && info.dli_fname);

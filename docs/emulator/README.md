@@ -90,7 +90,10 @@ then displayed the disabled-feature message. The diagnostic message action
 worked, and Nickel remained responsive through those checks. The standalone
 `nickel_screenshot:capture` test stopped before returning an action result in
 this QEMU guest, so screenshot support on 5.18 is **unverified**. Cloud login,
-sync, and USB hardware were not tested on 5.18.
+sync, and USB hardware were not tested on 5.18. The ARM compatibility test
+passed with `NM_TEST_UNSUPPORTED_FIRMWARE=1`, confirming the 5.18 binary does
+not accidentally receive the N365 cloud capability override reserved for the
+two reviewed 6.x binaries.
 
 Build and run the isolated 5.18 image from a fresh clone after building the
 Qt 6 plugin and VNC backend as above:
