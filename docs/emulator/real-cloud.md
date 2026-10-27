@@ -112,13 +112,20 @@ than a successful file download, open, or sync; record those separately.
 
 On 2026-10-27, this setup linked both services and displayed both file lists.
 Google Drive also reopened after leaving its list, and Dropbox opened after
-Google Drive. Downloading each provider's sample PDF produced its native
-"could not be synced" error dialog; the guest stayed responsive and Google
-Drive still opened after the Dropbox error. Nickel's local diagnostic recorded
-`dropboxParseFailed` and `googleDriveParseFailed` with a `file path` error,
-but did not establish the cause. These observations apply only to the QEMU
-userspace guest; the earlier physical repeat-open panic is still unresolved.
-No successful file download, open, or full sync was verified in this run.
+Google Drive. Google Drive downloaded the repository's
+`NickelMenuNG-GoogleDrive-20261026T141758Z.epub` fixture, showed it in My Books,
+and opened its page ending in `WALNUT`. This verifies a complete EPUB transfer
+and reader path in this guest.
+
+Downloading each provider's sample PDF produced its native "could not be
+synced" error dialog, although both PDF files reached onboard storage with
+valid PDF headers and end markers. Nickel logged a Foxit metadata warning and
+`dropboxParseFailed`/`googleDriveParseFailed` with a `file path` error. The
+cause of PDF import failure is not established. The guest stayed responsive,
+and Google Drive still opened after the Dropbox error. These observations
+apply only to the QEMU userspace guest; the earlier physical repeat-open
+panic remains unresolved. Dropbox EPUB import and a full library sync were
+not verified in this run.
 
 ## Reuse or remove the guest
 
