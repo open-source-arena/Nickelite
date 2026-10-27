@@ -23,6 +23,8 @@ printf 'Full\n' > "$battery/status"
 printf '0\n' > "$battery/time_to_full_now"
 printf '4200000\n' > "$battery/voltage_now"
 printf '1\n' > "$battery/present"
+# Kobo 5.18 reads the older mc13892_bat name; 6.x reads battery.
+ln -sfn battery "$(dirname "$battery")/mc13892_bat"
 if ! docker network inspect nm-real-cloud-egress >/dev/null 2>&1; then
     docker network create nm-real-cloud-egress >/dev/null
 fi

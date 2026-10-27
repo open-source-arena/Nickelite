@@ -1,6 +1,8 @@
 #include <QAction>
 #include <QApplication>
+#if NM_QT_MAJOR >= 6
 #include <QByteArrayView>
+#endif
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QFile>
@@ -13,8 +15,20 @@
 #include <QUrl>
 #include <QWidget>
 #include <QWidgetAction>
+#if NM_QT_MAJOR >= 6
+#include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QLabel>
+#include <QList>
+#include <QScrollArea>
+#include <QSettings>
+#include <QTimer>
+#include <QVBoxLayout>
+#endif
 
 #include <cstdlib>
+#include <cstring>
 
 #include <NickelHook.h>
 #include "native.h"
@@ -23,6 +37,115 @@
 #include "config.h"
 #include "nickelmenu.h"
 #include "util.h"
+
+#if NM_QT_MAJOR >= 6
+static void nm_show_dialog(QString const &title, QString const &body);
+
+struct nm_feature {
+    const char *key;
+    const char *label;
+};
+
+static constexpr nm_feature nm_features[] = {
+    {"commands", "Commands and output"},
+    {"kfmon", "KFMon launchers"},
+    {"settings", "Device settings"},
+    {"dark_mode", "Dark mode"},
+    {"screenshots", "Screenshots"},
+    {"usb", "USB connection"},
+    {"browser", "Web browser"},
+    {"navigation", "Kobo views"},
+    {"dropbox", "Dropbox"},
+    {"gdrive", "Google Drive"},
+    {"wifi", "Wi-Fi"},
+    {"orientation", "Orientation"},
+    {"power", "Power controls"},
+    {"book_scan", "Book rescan"},
+};
+
+static const char *nm_feature_for_action(nm_action_fn_t action, const char *argument) {
+    if (action == NM_ACTION(cmd_spawn) || action == NM_ACTION(cmd_output)) return "commands";
+    if (action == NM_ACTION(kfmon) || action == NM_ACTION(kfmon_id)) return "kfmon";
+    if (action == NM_ACTION(nickel_screenshot)) return "screenshots";
+    if (action == NM_ACTION(nickel_wifi)) return "wifi";
+    if (action == NM_ACTION(nickel_browser)) return "browser";
+    if (action == NM_ACTION(nickel_orientation)) return "orientation";
+    if (action == NM_ACTION(power)) return "power";
+    const QString arg = QString::fromUtf8(argument ? argument : "").trimmed();
+    if (action == NM_ACTION(nickel_setting)) {
+        const QString setting = arg.section(':', 1).trimmed();
+        if (setting == QLatin1String("dark_mode")) return "dark_mode";
+        if (setting == QLatin1String("screenshots")) return "screenshots";
+        if (setting == QLatin1String("auto_usb_gadget")) return "usb";
+        return "settings";
+    }
+    if (action == NM_ACTION(nickel_open)) {
+        if (arg == QLatin1String("library:dropbox")) return "dropbox";
+        if (arg == QLatin1String("library:gdrive")) return "gdrive";
+        return "navigation";
+    }
+    if (action == NM_ACTION(nickel_misc)) {
+        if (arg == QLatin1String("force_usb_connection") || arg == QLatin1String("rescan_books_full")) return "usb";
+        if (arg == QLatin1String("rescan_books")) return "book_scan";
+        return "navigation";
+    }
+    return nullptr; // diagnostics, chaining, and uninstall remain available for recovery
+}
+
+static bool nm_feature_enabled(const char *key) {
+    QSettings settings(QLatin1String(NM_CONFIG_DIR "/.features.ini"), QSettings::IniFormat);
+    return settings.value(QLatin1String(key), true).toBool();
+}
+
+static const char *nm_feature_label(const char *key) {
+    for (const auto &feature : nm_features)
+        if (!std::strcmp(feature.key, key)) return feature.label;
+    return key;
+}
+
+static void nm_show_feature_settings() {
+    auto *dialog = new QDialog(nullptr);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(QStringLiteral("NickelMenu Settings"));
+    dialog->resize(760, 1050);
+    auto *layout = new QVBoxLayout(dialog);
+    auto *title = new QLabel(QStringLiteral("NickelMenu Settings"), dialog);
+    title->setStyleSheet(QStringLiteral("font-size: 30px; font-weight: bold;"));
+    layout->addWidget(title);
+    auto *scroll = new QScrollArea(dialog);
+    scroll->setWidgetResizable(true);
+    auto *list = new QWidget(scroll);
+    auto *rows = new QVBoxLayout(list);
+    QList<QCheckBox *> boxes;
+    for (const auto &feature : nm_features) {
+        auto *box = new QCheckBox(QLatin1String(feature.label), list);
+        box->setChecked(nm_feature_enabled(feature.key));
+        box->setMinimumHeight(62);
+        box->setStyleSheet(QStringLiteral("QCheckBox { font-size: 24px; spacing: 20px; } QCheckBox::indicator { width: 36px; height: 36px; }"));
+        rows->addWidget(box);
+        boxes.append(box);
+    }
+    rows->addStretch();
+    scroll->setWidget(list);
+    layout->addWidget(scroll);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, dialog);
+    for (auto *button : buttons->findChildren<QPushButton *>()) button->setMinimumHeight(68);
+    layout->addWidget(buttons);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [dialog, boxes] {
+        QSettings settings(QLatin1String(NM_CONFIG_DIR "/.features.ini"), QSettings::IniFormat);
+        for (qsizetype i = 0; i < boxes.size(); ++i)
+            settings.setValue(QLatin1String(nm_features[i].key), boxes[i]->isChecked());
+        settings.sync();
+        if (settings.status() != QSettings::NoError) {
+            nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save feature settings."));
+            return;
+        }
+        dialog->accept();
+    });
+    dialog->open();
+}
+#endif
 
 typedef QWidget MenuTextItem; // it's actually a subclass, but we don't need its functionality directly, so we'll stay on the safe side
 typedef void MainWindowController;
@@ -546,12 +669,15 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
         NickelTouchMenu_NickelTouchMenu(menu, nullptr, 3);
 
-        for (size_t i = 0; i < items_n; i++) {
-            nm_menu_item_t *it = items[i];
-            if (it->loc != NM_MENU_LOCATION(main))
+        const size_t builtIn = NM_QT_MAJOR >= 6 ? 1 : 0;
+        for (size_t i = 0; i < items_n + builtIn; i++) {
+            const bool featureSettings = builtIn && i == 0;
+            nm_menu_item_t *it = featureSettings ? nullptr : items[i - builtIn];
+            if (!featureSettings && it->loc != NM_MENU_LOCATION(main))
                 continue;
 
-            NM_LOG("adding item '%s'...", it->lbl);
+            const char *label = featureSettings ? "NickelMenu Settings" : it->lbl;
+            NM_LOG("adding item '%s'...", label);
 
             // based on _ZN23SelectionMenuController18createMenuTextItemEP7QWidgetRK7QString
             // (also see _ZN28AbstractNickelMenuController18createMenuTextItemEP5QMenuRK7QStringbbS4_, which seems to do the gestures itself instead of calling registerForTapGestures)
@@ -565,7 +691,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
             }
 
             MenuTextItem_MenuTextItem(mti, menu, false, true);
-            MenuTextItem_setText(mti, QString::fromUtf8(it->lbl));
+            MenuTextItem_setText(mti, QString::fromUtf8(label));
             MenuTextItem_registerForTapGestures(mti); // this only makes the MenuTextItem::tapped signal connect so it highlights on tap, doesn't apply to the QAction::triggered below (which needs another GestureReceiver somewhere)
 
             // based on _ZN22AbstractMenuController12createActionEP5QMenuP7QWidgetbbb
@@ -578,7 +704,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
             QWidget::connect(ac, &QAction::triggered, menu, &QMenu::hide);
 
-            if (i != items_n-1)
+            if (i != items_n + builtIn - 1)
                 menu->addSeparator();
 
             // shim so we don't need to deal with GestureReceiver directly like _ZN28AbstractNickelMenuController18createMenuTextItemEP5QMenuRK7QStringbbS4_ does
@@ -593,7 +719,13 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
             // event handler
 
-            QObject::connect(ac, &QAction::triggered, [it](bool) {
+            QObject::connect(ac, &QAction::triggered, [it, featureSettings](bool) {
+                if (featureSettings) {
+#if NM_QT_MAJOR >= 6
+                    QTimer::singleShot(250, [] { nm_show_feature_settings(); });
+#endif
+                    return;
+                }
                 NM_LOG("item '%s' pressed...", it->lbl);
                 nm_menu_item_do(it, NULL, NULL);
                 NM_LOG("done");
@@ -938,17 +1070,24 @@ void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *a
         }
 
         nm_action_result_t *res = NULL;
-        if (!argtransform) {
-            res = cur->act(cur->arg);
-        } else {
+        char *transformed = nullptr;
+        const char *arg = cur->arg;
+        if (argtransform) {
             NM_LOG("...applying argtransform");
-            char *arg = (*argtransform)(argtransform_data, cur->arg);
-            if (arg) {
-                NM_LOG("...applied argtransform: %s", arg);
-                res = cur->act(arg);
-                free(arg);
-            }
+            transformed = (*argtransform)(argtransform_data, cur->arg);
+            arg = transformed;
+            if (arg) NM_LOG("...applied argtransform: %s", arg);
         }
+        if (arg) {
+#if NM_QT_MAJOR >= 6
+            const char *feature = nm_feature_for_action(cur->act, arg);
+            if (feature && !nm_feature_enabled(feature))
+                nm_err_set("%s is disabled in NickelMenu Settings", nm_feature_label(feature));
+            else
+#endif
+                res = cur->act(arg);
+        }
+        free(transformed);
         err = nm_err();
 
         if (err == NULL && res && res->type == NM_ACTION_RESULT_TYPE_SKIP) {

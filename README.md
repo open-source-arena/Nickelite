@@ -4,7 +4,7 @@ The easiest way to launch custom scripts, change hidden settings, and run action
 
 See the [website](https://pgaskin.net/NickelMenu) and [thread on MobileRead](https://mobileread.com/forums/showthread.php?t=329525) for screenshots and more details.
 
-## NickelMenuNG: experimental Kobo 6.x build
+## NickelMenuNG: experimental Qt 6 build
 
 This checkout targets Kobo's Qt 6 firmware, with **6.0.274403 and 6.0.279225**
 as exact cloud-compatibility targets. It reuses [Nico Verbruggen's Qt 6 port](https://github.com/nicoverbruggen/NickelMenu/tree/1a15faa9d0de810cd96a1a53359e175be4c7c7d5)
@@ -28,6 +28,10 @@ and provider switching in the QEMU userspace simulator; see the
 NickelMenu after reinstall; repeat cloud entry and provider switching stayed
 responsive. A successful build or symbol check does not establish
 compatibility with other 6.x releases or devices.
+The same build boots on the official Kobo 5.18.270971 firmware in an isolated
+QEMU userspace simulator. The menu, Settings popup, saved feature switch, and
+diagnostic action passed there; cloud access and screenshot capture have not
+been established on 5.x. See the [5.18 simulator report](docs/emulator/README.md#firmware-518-settings-check-2026-10-27).
 
 The repository contains source, the vendored NickelHook dependency, and local
 build instructions. It excludes generated `dist/` packages, firmware payloads
@@ -60,6 +64,10 @@ created there on first startup if missing. Create a separate text file such as
 `.adds/nm/uninstall` and reboot. The plugin's startup failsafe remains enabled.
 See [the configuration documentation](res/doc) to add menu entries. Errors are
 shown in the menu when possible; startup errors appear in `logread` over SSH.
+The built-in **NickelMenu Settings** item controls supported action groups on
+Qt 6. Its switches default to on and are saved in `.adds/nm/.features.ini`;
+deleting that hidden file restores defaults. See the
+[v0.6.0 feature matrix](docs/feature-matrix.md) for coverage and limits.
 
 Extras, Bluetooth controls, Pocket and reading awards are unavailable in this
 port. Actions check their required firmware symbols, native Qt allocation

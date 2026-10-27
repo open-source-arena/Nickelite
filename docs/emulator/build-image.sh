@@ -8,6 +8,12 @@ plugin=${2:?usage: build-image.sh WORK_DIRECTORY EXPERIMENTAL_KOBO_TGZ [QEMU_ARM
 qemu=${3:-/usr/bin/qemu-arm-static}
 firmware=${NM_FIRMWARE_VERSION:-6.0.274403}
 case "$firmware" in
+    5.18.270971)
+        firmware_url=https://ereaderfiles.kobo.com/firmwares/kobo12/Aug2026/qt6-update-5.18.270971.zip
+        firmware_hash=54ca98d7ffb8f7dd1f3edd92e854991a83593f261fed69d1c38b565f41517ef2
+        rootfs_hash=1d8f87823bce2d3b0ddffd31e1791899e482912f2f7b7a27fe730e9e853668b9
+        libnickel_hash=d3f39148d52779e3fad3bd4e642aa707c80324739a4ac1bfd0feae6e56f41f37
+        ;;
     6.0.274403)
         firmware_url=https://ereaderfiles.kobo.com/firmwares/kobo12/Sep2026/qt6-update-6.0.274403.zip
         firmware_hash=31d1462b3c7ae9f850c04b752b654404407cc4605c50885318a876ddb3b9ce47

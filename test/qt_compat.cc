@@ -45,6 +45,16 @@ int main(int argc, char **argv) {
     delete replacement;
 
 #if NM_QT_MAJOR >= 6
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_open), "library:dropbox"), "dropbox"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_open), "library:gdrive"), "gdrive"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_open), "library:authors"), "navigation"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_setting), "toggle : dark_mode"), "dark_mode"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_setting), "enable:screenshots"), "screenshots"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_misc), "force_usb_connection"), "usb"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_misc), "rescan_books"), "book_scan"));
+    assert(!nm_feature_for_action(NM_ACTION(uninstall), ""));
+    assert(!nm_feature_for_action(NM_ACTION(skip), "1"));
+
     Device_isSpaKoboBW = test_model_support;
     Device_supportsDropbox = test_original_dropbox_support;
     Device_supportsGoogleDrive = test_original_gdrive_support;

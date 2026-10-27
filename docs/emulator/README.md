@@ -6,6 +6,10 @@ plugin loading and selected actions. This is a userspace approximation, not a
 booted Kobo board. See [action results](../action-compatibility-6.md) and
 [full-system feasibility](../emulator-board-feasibility.md).
 
+The image builder also pins official Clara BW **5.18.270971** and **6.0.279225**
+firmware. Set `NM_FIRMWARE_VERSION=5.18.270971` for the 5.x image. Its SHA-256
+checks are in [build-image.sh](build-image.sh); firmware stays outside Git.
+
 ## What a fresh clone provides
 
 This repository includes the SDK builder, emulator-only VNC patch, guest
@@ -75,6 +79,39 @@ touch events, preserving one contact through right-button chord changes.
 Run it against a fresh container from the build-stage image: its asserted patch
 expects unmodified source. The root-run container may leave a root-owned output.
 This emulator-only plugin does not belong in the production `Kobo.tgz` archive.
+
+## Firmware 5.18 settings check (2026-10-27)
+
+The 5.18.270971 Kobo firmware image booted with the same Qt 6 `Kobo.tgz`
+build. On a fresh, sideloaded-mode onboard directory, the NickelMenu tab and
+Settings popup appeared. Saving **Dark mode** off wrote
+`.adds/nm/.features.ini` with `dark_mode=false`; the Dark mode menu action
+then displayed the disabled-feature message. The diagnostic message action
+worked, and Nickel remained responsive through those checks. The standalone
+`nickel_screenshot:capture` test stopped before returning an action result in
+this QEMU guest, so screenshot support on 5.18 is **unverified**. Cloud login,
+sync, and USB hardware were not tested on 5.18.
+
+Build and run the isolated 5.18 image from a fresh clone after building the
+Qt 6 plugin and VNC backend as above:
+
+```sh
+work="$HOME/nickelmenung-qemu-5.18"
+NM_FIRMWARE_VERSION=5.18.270971 sh docs/emulator/build-image.sh \
+  "$work" /absolute/path/to/Kobo.tgz /absolute/path/to/qemu-arm-static
+NM_FIRMWARE_VERSION=5.18.270971 sh docs/emulator/run-real-network.sh \
+  "$work" /absolute/path/to/noVNC-1.6.0 6096
+```
+
+For an account-free check, create
+`$work/onboard/.kobo/Kobo/Kobo eReader.conf` with
+`[ApplicationPreferences]`, `CurrentLocale=en_US`, and
+`SideloadedMode=true` before launching. Add a disposable
+`.adds/nm/simulator` menu item such as
+`menu_item:main:Simulator marker:dbg_msg:Kobo 5.18`. The launcher binds both
+battery names read by the 5.x and 6.x userspace. Its VNC patch translates
+clicks to touchscreen events; rebuilding the older repaint-only VNC module
+leaves the 5.18 interface visible but untappable.
 
 ## Reuse an already prepared guest
 
