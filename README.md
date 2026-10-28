@@ -6,7 +6,7 @@ Simulator screenshots (use Ctrl-click or Command-click to open one in a new tab)
 
 [Menu](docs/screenshots/main-menu.png) · [Shortcuts](docs/screenshots/settings-shortcuts.png) · [Menu items](docs/screenshots/settings-menu-items.png) · [Permissions](docs/screenshots/settings-permissions.png)
 
-<img src="docs/screenshots/settings-shortcuts.png" alt="Nickelite Settings on the Shortcuts tab" width="50%">
+<p align="center"><img src="docs/screenshots/settings-shortcuts.png" alt="Nickelite Settings on the Shortcuts tab" width="50%"></p>
 
 ## What it does
 
@@ -15,6 +15,10 @@ Simulator screenshots (use Ctrl-click or Command-click to open one in a new tab)
 - Provides shortcuts for screenshots, dark mode, orientation, Wi-Fi, power actions, Dropbox, and Google Drive. Permissions can disable individual action groups; blocked menu items remain visible but cannot run.
 - Uses separate active and inactive tab icons.
 - Displays its version at the bottom of Settings. A firmware update may remove the plugin; reinstalling the package preserves the user config directory.
+
+On the tested Clara BW firmware, Nickelite also enables Kobo's own **My Dropbox** and **My Google Drive** entries in the native More screen:
+
+<p align="center"><img src="docs/screenshots/native-more-cloud.png" alt="Kobo More screen with My Dropbox and My Google Drive" width="50%"></p>
 
 | Firmware | Package | Evidence |
 | --- | --- | --- |
