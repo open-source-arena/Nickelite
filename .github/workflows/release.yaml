@@ -1,64 +1,35 @@
-name: Release
+name: Release Nickelite
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag_name:
-        description: 'new/existing tag name'
-        required: true
-      target_commitish:
-        description: 'target if new tag'
-        default: master
+  push:
+    tags:
+    - 'v*'
 
 permissions:
   contents: write
-  id-token: write
-  attestations: write
 
 jobs:
-  build:
-    name: NickelMenu
+  release:
     runs-on: ubuntu-latest
-    container: ghcr.io/pgaskin/nickeltc:1.0
     steps:
-    - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        submodules: true
-    - name: Build
-      uses: docker://ghcr.io/pgaskin/nickeltc:1.0
-      with:
-        entrypoint: make
-        args: all koboroot
-    - name: Attest
-      uses: actions/attest-build-provenance@v3
-      with:
-        subject-path: |
-          KoboRoot.tgz
-    - name: Create draft release
-      uses: actions/github-script@v8
-      id: draft_release
-      with:
-        script: |
-          const {data: {id: id}} = await github.rest.repos.createRelease({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            tag_name: context.payload.inputs.tag_name,
-            target_commitish: context.payload.inputs.target_commitish,
-            name: `NickelMenu ${context.payload.inputs.tag_name}`,
-            draft: true,
-          })
-          core.setOutput('id', id)
-    - name: Upload release asset
-      uses: actions/github-script@v8
-      with:
-        retries: 3 # note: this applies to individual github.rest calls, not the entire script
-        script: |
-          const {readFile} = require('fs').promises
-          await github.rest.repos.uploadReleaseAsset({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            release_id: '${{steps.draft_release.outputs.id}}',
-            name: 'KoboRoot.tgz',
-            data: await readFile(`KoboRoot.tgz`),
-          })
+    - uses: actions/checkout@v6
+    - name: Verify versioned packages
+      run: |
+        version="${GITHUB_REF_NAME#v}"
+        test -d "dist/$version"
+        cd "dist/$version"
+        sha256sum -c SHA256SUMS
+        for package in *.zip; do
+          work="$(mktemp -d)"
+          unzip -q "$package" -d "$work"
+          (cd "$work" && sha256sum -c SHA256SUMS)
+        done
+    - name: Publish release assets
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        version="${GITHUB_REF_NAME#v}"
+        gh release create "$GITHUB_REF_NAME" "dist/$version/"*.zip "dist/$version/SHA256SUMS" \
+          scripts/install.sh scripts/install.ps1 \
+          --repo "$GITHUB_REPOSITORY" --verify-tag --title "Nickelite $version" \
+          --notes-file "dist/$version/RELEASE.md"

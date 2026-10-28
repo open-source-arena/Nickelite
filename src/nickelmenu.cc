@@ -171,13 +171,14 @@ static void nm_set_menu_widget_enabled(QWidget *widget, bool enabled) {
 static const QString nm_ui_items_path = QLatin1String(NM_CONFIG_DIR "/zz-nm-settings.conf");
 
 static bool nm_config_valid() {
+    nm_err_set(nullptr);
     nm_config_file_t *files = nm_config_files();
     if (nm_err_peek()) return false;
     nm_config_t *config = nm_config_parse(files);
     nm_config_files_free(files);
-    if (!config) return false;
+    const bool valid = config || !nm_err_peek();
     nm_config_free(config);
-    return true;
+    return valid;
 }
 
 static QStringList nm_menu_fields(const QString &line) {
@@ -289,7 +290,7 @@ static void nm_confirm_discard(QWidget *parent, std::function<void()> discard,
         if (dialog) {
             ctor(dialog, parent);
             setTitle(dialog, QStringLiteral("Discard changes?"));
-            setText(dialog, QStringLiteral("Your NickelMenu changes have not been applied."));
+            setText(dialog, QStringLiteral("Your Nickelite changes have not been applied."));
             acceptText(dialog, QStringLiteral("Discard"));
             rejectText(dialog, QStringLiteral("Keep editing"));
             dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -300,7 +301,7 @@ static void nm_confirm_discard(QWidget *parent, std::function<void()> discard,
         }
     }
     if (QMessageBox::question(parent, QStringLiteral("Discard changes?"),
-            QStringLiteral("Your NickelMenu changes have not been applied."),
+            QStringLiteral("Your Nickelite changes have not been applied."),
             QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Discard)
         discard();
     else
@@ -342,11 +343,16 @@ public:
 protected:
     bool eventFilter(QObject *object, QEvent *event) override {
         auto *widget = qobject_cast<QWidget *>(object);
-        if (!widget || widget == view || view->isAncestorOf(widget)
-            || (!widget->isWindow() && !widget->isModal())) return false;
+        if (!widget || widget == view || view->isAncestorOf(widget)) return false;
+        const QRect viewArea(view->mapToGlobal(QPoint(0, 0)), view->size());
+        const QRect widgetArea(widget->mapToGlobal(QPoint(0, 0)), widget->size());
+        const bool coversView = widgetArea.intersected(viewArea).width() >= viewArea.width() * 4 / 5
+            && widgetArea.intersected(viewArea).height() >= viewArea.height() * 4 / 5;
+        if (!widget->isWindow() && !widget->isModal() && !coversView) return false;
         const Qt::WindowType type = widget->windowType();
         if (type == Qt::Popup || type == Qt::ToolTip || type == Qt::Tool || widget->inherits("MainWindow")) return false;
-        if (event->type() == QEvent::Show && !dialogs.contains(widget)) {
+        if ((event->type() == QEvent::Show || (event->type() == QEvent::Resize && widget->isVisible()))
+            && !dialogs.contains(widget)) {
             dialogs.insert(widget);
             QObject::connect(widget, &QObject::destroyed, this, [this, widget] { resume(widget); });
             view->hide();
@@ -403,7 +409,7 @@ static void nm_native_set_content(QWidget *view, QWidget *content) {
 
 static QString nm_choice_label(const QString &key) {
     static constexpr struct { const char *key; const char *label; } labels[] = {
-        {"main", "NickelMenu tab"}, {"reader", "While reading"},
+        {"main", "Nickelite tab"}, {"reader", "While reading"},
         {"browser", "Web browser"}, {"library", "My Books filter"},
         {"selection", "Selected text"}, {"selection_search", "Selection search"},
         {"cmd_spawn", "Run a command"}, {"cmd_output", "Show command output"},
@@ -416,7 +422,7 @@ static QString nm_choice_label(const QString &key) {
         {"nickel_orientation", "Change orientation"},
         {"nickel_screenshot", "Take a screenshot"},
         {"power", "Sleep, restart or power off"},
-        {"skip", "Skip chained actions"}, {"uninstall", "Uninstall NickelMenu"},
+        {"skip", "Skip chained actions"}, {"uninstall", "Uninstall Nickelite"},
     };
     for (const auto &entry : labels)
         if (key == QLatin1String(entry.key)) return QString::fromLatin1(entry.label);
@@ -452,7 +458,7 @@ static void nm_group_ui_items(QListWidget *list) {
         const QString target = item->data(Qt::UserRole).toStringList().value(2);
         if (target != previous) {
             auto *heading = new QListWidgetItem(target == QLatin1String("main")
-                ? QStringLiteral("NickelMenu") : nm_choice_label(target));
+                ? QStringLiteral("Nickelite") : nm_choice_label(target));
             heading->setData(Qt::UserRole, QStringList{QString(), QStringLiteral("-1"), target,
                 QString(), QString(), QString()});
             heading->setFlags(Qt::NoItemFlags);
@@ -793,7 +799,7 @@ static void nm_native_style_button(QPushButton *button) {
 static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool duplicate = false) {
     QWidget *editor = nm_native_view(existing && !duplicate ? QStringLiteral("Edit menu item") : QStringLiteral("Add menu item"), list->window());
     if (!editor) {
-        nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Kobo's native editor is unavailable on this firmware."));
+        nm_show_dialog(QStringLiteral("Nickelite Settings"), QStringLiteral("Kobo's native editor is unavailable on this firmware."));
         return;
     }
     editor->setObjectName(QStringLiteral("nmEditor"));
@@ -852,6 +858,10 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
     auto *save = new QPushButton(QStringLiteral("Done"), content);
     nm_native_style_button(save);
     layout->addWidget(save);
+    auto *version = new QLabel(QStringLiteral("Nickelite v" NH_VERSION), content);
+    version->setAlignment(Qt::AlignCenter);
+    version->setStyleSheet(QStringLiteral("color: #777; font-size: 18px;"));
+    layout->addWidget(version);
     nm_native_set_content(editor, content);
     QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, duplicate, location, label, action, argument, guard] {
         if (label->text().trimmed().isEmpty() || label->text().contains(':') || label->text().contains('\n')
@@ -876,9 +886,9 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
 }
 
 static void nm_show_feature_settings() {
-    QWidget *view = nm_native_view(QStringLiteral("NickelMenu Settings"));
+    QWidget *view = nm_native_view(QStringLiteral("Nickelite Settings"));
     if (!view) {
-        nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Kobo's native settings view is unavailable on this firmware."));
+        nm_show_dialog(QStringLiteral("Nickelite Settings"), QStringLiteral("Kobo's native settings view is unavailable on this firmware."));
         return;
     }
     new NmSystemDialogGuard(view);
@@ -998,7 +1008,7 @@ static void nm_show_feature_settings() {
     auto *quickPage = new QWidget(tabs);
     auto *quickLayout = new QVBoxLayout(quickPage);
     quickLayout->setContentsMargins(0, 0, 0, 0);
-    auto *quickHeading = new QLabel(QStringLiteral("Manage items shown on main NickelMenu menu"), quickPage);
+    auto *quickHeading = new QLabel(QStringLiteral("Manage items shown on main Nickelite menu"), quickPage);
     quickHeading->setObjectName(QStringLiteral("nmSectionHeading"));
     quickLayout->addWidget(quickHeading);
     auto *quickPageNumber = new QLabel(quickPage);
@@ -1148,6 +1158,10 @@ static void nm_show_feature_settings() {
     saveRow->addWidget(save, 0, 0, 1, 2);
     saveRow->addWidget(cancel, 0, 2);
     layout->addLayout(saveRow);
+    auto *version = new QLabel(QStringLiteral("Nickelite v" NH_VERSION), content);
+    version->setAlignment(Qt::AlignCenter);
+    version->setStyleSheet(QStringLiteral("color: #777; font-size: 18px;"));
+    layout->addWidget(version);
     auto refreshDirty = [isDirty, save, cancel, saveRow] {
         const bool dirty = isDirty();
         save->setEnabled(dirty);
@@ -1167,7 +1181,7 @@ static void nm_show_feature_settings() {
     QObject::connect(cancel, &QPushButton::clicked, view, [view] { view->close(); });
     QObject::connect(save, &QPushButton::clicked, view, [view, boxes, menuItems, editable, snapshots, guard] {
         if (editable && !nm_write_ui_items(menuItems, snapshots)) {
-            nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save menu items."));
+            nm_show_dialog(QStringLiteral("Nickelite Settings"), QStringLiteral("Could not save menu items."));
             return;
         }
         QSettings settings(QLatin1String(NM_CONFIG_DIR "/.features.ini"), QSettings::IniFormat);
@@ -1175,7 +1189,7 @@ static void nm_show_feature_settings() {
             settings.setValue(QLatin1String(nm_features[i].key), boxes[i]->isChecked());
         settings.sync();
         if (settings.status() != QSettings::NoError) {
-            nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save feature settings."));
+            nm_show_dialog(QStringLiteral("Nickelite Settings"), QStringLiteral("Could not save feature settings."));
             return;
         }
         nm_global_config_reload();
@@ -1299,8 +1313,13 @@ typedef QMenu TouchMenu;
 typedef TouchMenu NickelTouchMenu;
 typedef int DecorationPosition;
 void (*NickelTouchMenu_NickelTouchMenu)(NickelTouchMenu*, QWidget* parent, DecorationPosition position);
+void (*NickelTouchMenu_showDecoration)(NickelTouchMenu*, bool);
+void (*NickelTouchMenu_setTargetRect)(NickelTouchMenu*, QRect const&);
+void (*NickelTouchMenu_setDecorationPosition)(NickelTouchMenu*, DecorationPosition);
+void (*NickelTouchMenu_setDecorationPositionOffset)(NickelTouchMenu*, QPoint const&);
 void (*MenuTextItem_MenuTextItem)(MenuTextItem*, QWidget* parent, bool checkable, bool italic);
 void (*MenuTextItem_setText)(MenuTextItem*, QString const& text);
+void (*MenuTextItem_setTextItalics)(MenuTextItem*, bool italic);
 void (*MenuTextItem_registerForTapGestures)(MenuTextItem*);
 
 // Selection menu stuff (14622+).
@@ -1402,7 +1421,7 @@ extern "C" __attribute__((visibility("default"))) bool _nm_device_supports_googl
 #endif
 
 static struct nh_info NickelMenu = (struct nh_info){
-    .name            = "NickelMenu",
+    .name            = "Nickelite",
     .desc            = "Integrated launcher for Nickel.",
     .uninstall_flag  = NM_CONFIG_DIR "/uninstall",
 #ifdef NM_UNINSTALL_CONFIGDIR
@@ -1457,8 +1476,13 @@ static struct nh_dlsym NickelMenuDlsym[] = {
     {.name = "_ZN13MainNavButton7setTextERK7QString",                .out = nh_symoutptr(MainNavButton_setText),               .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN13MainNavButton7setTextERK7QString
     {.name = "_ZN13MainNavButton6tappedEv",                          .out = nh_symoutptr(MainNavButton_tapped),                .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN13MainNavButton6tappedEv
     {.name = "_ZN15NickelTouchMenuC2EP7QWidget18DecorationPosition", .out = nh_symoutptr(NickelTouchMenu_NickelTouchMenu),     .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN15NickelTouchMenuC2EP7QWidget18DecorationPosition
+    {.name = "_ZN15NickelTouchMenu14showDecorationEb", .out = nh_symoutptr(NickelTouchMenu_showDecoration), .desc = "main menu popover caret", .optional = true},
+    {.name = "_ZN15NickelTouchMenu13setTargetRectERK5QRect", .out = nh_symoutptr(NickelTouchMenu_setTargetRect), .desc = "main menu popover caret", .optional = true},
+    {.name = "_ZN15NickelTouchMenu21setDecorationPositionE18DecorationPosition", .out = nh_symoutptr(NickelTouchMenu_setDecorationPosition), .desc = "main menu popover caret", .optional = true},
+    {.name = "_ZN15NickelTouchMenu27setDecorationPositionOffsetERK6QPoint", .out = nh_symoutptr(NickelTouchMenu_setDecorationPositionOffset), .desc = "main menu popover caret", .optional = true},
     {.name = "_ZN12MenuTextItemC1EP7QWidgetbb",                      .out = nh_symoutptr(MenuTextItem_MenuTextItem),           .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN12MenuTextItemC1EP7QWidgetbb
     {.name = "_ZN12MenuTextItem7setTextERK7QString",                 .out = nh_symoutptr(MenuTextItem_setText),                .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN12MenuTextItem7setTextERK7QString
+    {.name = "_ZN12MenuTextItem14setTextItalicsEb", .out = nh_symoutptr(MenuTextItem_setTextItalics), .desc = "main menu popover text style", .optional = true},
     {.name = "_ZN12MenuTextItem22registerForTapGesturesEv",          .out = nh_symoutptr(MenuTextItem_registerForTapGestures), .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN12MenuTextItem22registerForTapGesturesEv
 
     // selection menu injection (14622+)
@@ -1727,7 +1751,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
     const bool hasInactiveIcon = nm_write_default_icon(inactiveIcon, 0);
     const bool hasActiveIcon = nm_write_default_icon(activeIcon, 1);
     main_nav_button_configure(btn,
-        nm_global_config_experimental("menu_main_15505_label") ?: "NickelMenu",
+        nm_global_config_experimental("menu_main_15505_label") ?: "Nickelite",
         nm_global_config_experimental("menu_main_15505_icon") ?: (hasInactiveIcon ? inactiveIcon : nullptr),
         ":/images/home/main_nav_more.png",
         nm_global_config_experimental("menu_main_15505_icon_active") ?: (hasActiveIcon ? activeIcon : nullptr),
@@ -1745,7 +1769,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
     QWidget::connect(sh, &QPushButton::pressed, [btn] {
         if (!NickelTouchMenu_NickelTouchMenu || !MenuTextItem_MenuTextItem || !MenuTextItem_setText || !MenuTextItem_registerForTapGestures) {
             NM_LOG("could not find required NickelTouchMenu and MenuTextItem symbols for generating menu");
-            nm_show_dialog(QLatin1String("NickelMenu"), QLatin1String("Could not find required NickelTouchMenu and MenuTextItem symbols for generating menu (this is a bug)."));
+            nm_show_dialog(QLatin1String("Nickelite"), QLatin1String("Could not find required NickelTouchMenu and MenuTextItem symbols for generating menu (this is a bug)."));
             return;
         }
 
@@ -1760,18 +1784,31 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
         if (!items) {
             NM_LOG("failed to get menu items");
-            nm_show_dialog(QLatin1String("NickelMenu"), QLatin1String("Failed to get menu items (this might be a bug)."));
+            nm_show_dialog(QLatin1String("Nickelite"), QLatin1String("Failed to get menu items (this might be a bug)."));
             return;
         }
 
         NickelTouchMenu *menu = reinterpret_cast<NickelTouchMenu*>(nm_native_storage("NickelTouchMenu", 512));
         if (!menu) {
             NM_LOG("failed to allocate memory for menu");
-            nm_show_dialog(QLatin1String("NickelMenu"), QLatin1String("Failed to allocate memory for menu."));
+            nm_show_dialog(QLatin1String("Nickelite"), QLatin1String("Failed to allocate memory for menu."));
             return;
         }
 
-        NickelTouchMenu_NickelTouchMenu(menu, nullptr, 3);
+        auto option = [](const char *name, int fallback = 0) {
+            const char *value = nm_global_config_experimental(name);
+            if (!value) return fallback;
+            bool ok = false;
+            const int parsed = QString::fromLatin1(value).toInt(&ok);
+            return ok ? parsed : fallback;
+        };
+        const bool caret = option("menu_main_15505_caret") == 1
+            && NickelTouchMenu_showDecoration && NickelTouchMenu_setTargetRect;
+        const int decoration = option("menu_main_15505_decoration", 3);
+        const bool flushSeparators = option("menu_main_15505_flush_separators") == 1
+            && LightMenuSeparator_LightMenuSeparator;
+        const bool italic = option("menu_main_15505_italic", 1) != 0;
+        NickelTouchMenu_NickelTouchMenu(menu, caret ? btn->window() : nullptr, decoration);
 
         const size_t builtIn = NM_QT_MAJOR >= 6 ? 1 : 0;
         for (size_t i = 0; i < items_n + builtIn; i++) {
@@ -1780,7 +1817,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
             if (!featureSettings && it->loc != NM_MENU_LOCATION(main))
                 continue;
 
-            const char *label = featureSettings ? "NickelMenu Settings" : it->lbl;
+            const char *label = featureSettings ? "Nickelite Settings" : it->lbl;
             NM_LOG("adding item '%s'...", label);
 
             // based on _ZN23SelectionMenuController18createMenuTextItemEP7QWidgetRK7QString
@@ -1790,12 +1827,14 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
             if (!mti) {
                 NM_LOG("failed to allocate memory for config item");
                 menu->deleteLater();
-                nm_show_dialog(QLatin1String("NickelMenu"), QLatin1String("Failed to allocate memory for menu item."));
+                nm_show_dialog(QLatin1String("Nickelite"), QLatin1String("Failed to allocate memory for menu item."));
                 return;
             }
 
-            MenuTextItem_MenuTextItem(mti, menu, false, true);
+            MenuTextItem_MenuTextItem(mti, menu, false, italic);
             MenuTextItem_setText(mti, QString::fromUtf8(label));
+            if (!italic && MenuTextItem_setTextItalics)
+                MenuTextItem_setTextItalics(mti, false);
             MenuTextItem_registerForTapGestures(mti); // this only makes the MenuTextItem::tapped signal connect so it highlights on tap, doesn't apply to the QAction::triggered below (which needs another GestureReceiver somewhere)
             bool enabled = true;
 #if NM_QT_MAJOR >= 6
@@ -1813,8 +1852,17 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
             QWidget::connect(ac, &QAction::triggered, menu, &QMenu::hide);
 
-            if (i != items_n + builtIn - 1)
-                menu->addSeparator();
+            if (i != items_n + builtIn - 1) {
+                QAction *separator = nullptr;
+                if (flushSeparators) {
+                    separator = reinterpret_cast<QAction *>(nm_native_storage("LightMenuSeparator", 32));
+                    if (separator) {
+                        LightMenuSeparator_LightMenuSeparator(separator, menu);
+                        menu->addAction(separator);
+                    }
+                }
+                if (!separator) menu->addSeparator();
+            }
 
             // shim so we don't need to deal with GestureReceiver directly like _ZN28AbstractNickelMenuController18createMenuTextItemEP5QMenuRK7QStringbbS4_ does
             // (similar to _ZN23SelectionMenuController11addMenuItemEP17SelectionMenuViewP12MenuTextItemPKc)
@@ -1822,7 +1870,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
             if (!QWidget::connect(mti, SIGNAL(tapped(bool)), ac, SIGNAL(triggered()))) {
                 NM_LOG("could not handle touch events for menu item (connection of SIGNAL(tapped(bool)) on MenuTextItem to SIGNAL(triggered()) on QWidgetAction failed)");
                 menu->deleteLater();
-                nm_show_dialog(QLatin1String("NickelMenu"), QLatin1String("Could not attach touch event handlers to menu item (this is a bug)."));
+                nm_show_dialog(QLatin1String("Nickelite"), QLatin1String("Could not attach touch event handlers to menu item (this is a bug)."));
                 return;
             }
 
@@ -1846,8 +1894,30 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
         QWidget::connect(menu, &QMenu::aboutToHide, menu, &QWidget::deleteLater);
 
+        if (caret) {
+            NickelTouchMenu_showDecoration(menu, true);
+            if (NickelTouchMenu_setDecorationPosition)
+                NickelTouchMenu_setDecorationPosition(menu, decoration);
+            const QRect target(btn->mapToGlobal(QPoint(0, 0)), btn->size());
+            NickelTouchMenu_setTargetRect(menu, target);
+            if (NickelTouchMenu_setDecorationPositionOffset)
+                NickelTouchMenu_setDecorationPositionOffset(menu, target.topLeft()
+                    + QPoint(option("menu_main_15505_caret_dx"), option("menu_main_15505_caret_dy")));
+        }
+        const int width = option("menu_main_15505_width");
+        if (width > 0) menu->setFixedWidth(qMin(width, btn->window()->width()));
         menu->ensurePolished();
         menu->popup(btn->mapToGlobal(btn->geometry().topRight() - QPoint(0, menu->sizeHint().height())));
+        const QPoint offset(option("menu_main_15505_offset_x"), option("menu_main_15505_offset_y"));
+        if (!offset.isNull()) menu->move(menu->pos() + offset);
+        if (flushSeparators) {
+            const int inset = qBound(0, option("menu_main_15505_separator_inset"), menu->width() / 2);
+            for (QWidget *widget : menu->findChildren<QWidget *>()) {
+                if (!widget->inherits("LightMenuSeparator")) continue;
+                const QRect rect = widget->geometry();
+                widget->setGeometry(inset, rect.y(), menu->width() - 2 * inset, rect.height());
+            }
+        }
     });
 
     bl->addWidget(btn, 1);
@@ -1932,7 +2002,7 @@ static void nm_selection_inject(SelectionMenuController *_this, SelectionMenuVie
 
     if (!items) {
         NM_LOG("failed to get menu items");
-        nm_show_dialog(QLatin1String("NickelMenu"), QLatin1String("Failed to get menu items (this might be a bug)."));
+        nm_show_dialog(QLatin1String("Nickelite"), QLatin1String("Failed to get menu items (this might be a bug)."));
         return;
     }
 
@@ -1980,13 +2050,13 @@ static void nm_selection_inject(SelectionMenuController *_this, SelectionMenuVie
                 for (auto *widget : QApplication::allWidgets()) {
                     if (!widget->isVisible() || !widget->inherits("PageImageReader")) continue;
                     if (reader) {
-                        nm_show_dialog(QStringLiteral("NickelMenu"), QStringLiteral("More than one active reader."));
+                        nm_show_dialog(QStringLiteral("Nickelite"), QStringLiteral("More than one active reader."));
                         return;
                     }
                     reader = widget;
                 }
                 if (!reader || !PageImageReader_selectedText) {
-                    nm_show_dialog(QStringLiteral("NickelMenu"), QStringLiteral("Selected text is unavailable."));
+                    nm_show_dialog(QStringLiteral("Nickelite"), QStringLiteral("Selected text is unavailable."));
                     return;
                 }
                 const QString selection = PageImageReader_selectedText(reader);
@@ -2207,7 +2277,7 @@ void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *a
 #if NM_QT_MAJOR >= 6
             const char *feature = nm_feature_for_action(cur->act, arg);
             if (feature && !nm_feature_enabled(feature))
-                nm_err_set("%s is disabled in NickelMenu Settings", nm_feature_label(feature));
+                nm_err_set("%s is disabled in Nickelite Settings", nm_feature_label(feature));
             else
 #endif
                 res = cur->act(arg);

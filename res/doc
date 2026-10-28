@@ -1,13 +1,11 @@
-# NickelMenu (libnm.so)
+# Nickelite (libnm.so)
 # https://pgaskin.net/NickelMenu
 #
 # This tool injects menu items into Nickel.
 #
-# This experimental Qt6 build uses Kobo.tgz. Its menu and Settings passed a
-# Kobo 5.18.270971 simulator check; the cloud compatibility guard targets
-# firmware 6.0.274403 and 6.0.279225 on Clara BW (N365).
-# Qt5 builds use KoboRoot.tgz
-# on firmware 4.x. These binaries are not interchangeable.
+# This Qt6 build targets Kobo firmware 5+ and uses Kobo.tgz. Its menu and
+# Settings passed a 5.18.270971 simulator check; the cloud compatibility guard
+# targets firmware 6.0.274403 and 6.0.279225 on Clara BW (N365).
 # Missing dependencies disable only the affected menu, action or output.
 # Unsupported actions return an error; chain_failure can handle it.
 # Extras, Bluetooth, Pocket and awards are unavailable in the Qt6 build.
@@ -15,7 +13,7 @@
 # slots. These checks do not prove private layout compatibility on new firmware.
 # On Qt6, the library creates this doc on user storage at first startup
 # without replacing existing files. Remove an explicit uninstall file before
-# reinstalling. NickelMenu Settings has Shortcuts, Menu items, and Permissions.
+# reinstalling. Nickelite Settings has Shortcuts, Menu items, and Permissions.
 # Shortcuts add/remove ready-made menu items. Permissions gate action groups;
 # they default to enabled and are saved in the hidden .features.ini file.
 # The lists scroll and have vertical scrollbars on smaller screens.
@@ -31,7 +29,7 @@
 # one of the the following formats (spaces around fields are ignored):
 #
 #   menu_item:<location>:<label>:<action>:<arg>
-# On Qt 6, NickelMenu Settings > Menu items can add, edit and remove these
+# On Qt 6, Nickelite Settings > Menu items can add, edit and remove these
 # lines in the existing config files. Reopen Settings after a manual edit to
 # see it there. New on-device items go to zz-nm-settings.conf. Editing keeps
 # following chain_* lines; removing an item removes its following chain_* lines.
@@ -214,13 +212,13 @@
 #
 #   experimental:<key>:<val>
 #     Sets an experimental option. These are not guaranteed to be stable or be
-#     compatible across NickelMenu or firmware versions, and may stop working at
+#     compatible across Nickelite or firmware versions, and may stop working at
 #     any time. In addition, these options may not take effect without a reboot.
 #     Unknown options are ignored. If there are multiple declarations of an
 #     option, only the first one takes effect.
 #
 #     <key>  the option name:
-#              menu_main_15505_<main menu option>      - controls the added NickelMenu button
+#              menu_main_15505_<main menu option>      - controls the added Nickelite button
 #              menu_main_15505_<n>_<main_menu_option>  - controls the main menu button at position n (indexed from 0)
 #                                                        note that there may be already-hidden buttons in the list:
 #                                                        on a Kobo Libra Colour running 4.41.23145, the button list is:
@@ -232,10 +230,19 @@
 #                                                            5 - More
 #
 #              <main menu option>    one of:
-#                  enabled          - controls enablement of the NickelMenu button on 4.23.15505+
-#                  label            - sets the label used for the NickelMenu button on 4.23.15505+
-#                  icon             - sets the icon used for the NickelMenu button on 4.23.15505+
-#                  icon_active      - sets the active icon used for the NickelMenu button on 4.23.15505+
+#                  enabled          - controls enablement of the Nickelite button on 4.23.15505+
+#                  label            - sets the label used for the Nickelite button on 4.23.15505+
+#                  icon             - sets the icon used for the Nickelite button on 4.23.15505+
+#                  icon_active      - sets the active icon used for the Nickelite button on 4.23.15505+
+#                  caret            - 1 requests a pointer toward the tab (default 0;
+#                                     not yet visible in the Qt 6 simulator)
+#                  decoration       - pointer edge: 0 top, 1 right, 2 left, 3 bottom (default 3)
+#                  caret_dx/dy      - pointer anchor offset in pixels
+#                  offset_x/y       - menu offset in pixels after screen fitting
+#                  width            - menu width in pixels (default automatic)
+#                  flush_separators - 1 uses full-width native row dividers (default 0)
+#                  separator_inset  - divider inset in pixels (default 0)
+#                  italic           - 0 makes labels upright (default 1)
 #
 #     <val>  the option value:
 #              (..)_enabled     -> 0 or 1
@@ -284,16 +291,16 @@
 # which can be viewed over telnet or SSH (the username is root) with the command
 # logread.
 #
-# To uninstall NickelMenu, create a file in this directory named "uninstall",
+# To uninstall Nickelite, create a file in this directory named "uninstall",
 # or manually uninstall it by deleting libnm.so. You can also uninstall it by
 # triggering the failsafe mechanism by turning your Kobo off within 20 seconds
 # of turning it on.
 #
-# To use NickelMenu to launch other software, you can usually use cmd_spawn with
+# To use Nickelite to launch other software, you can usually use cmd_spawn with
 # the normal launch script. For example, KOReader and Plato will work as-is (or
 # with NiLuJe's one-click install packages which include NM). For specific
 # instructions, you should see their documentation (most newer software has
-# information about NickelMenu). If using cmd_spawn directly doesn't work, you
+# information about Nickelite). If using cmd_spawn directly doesn't work, you
 # can also try using KFMon and the kfmon action/generator.
 #
 # - NiLuJe's KOReader/Plato packages: https://www.mobileread.com/forums/showthread.php?t=314220
@@ -301,10 +308,10 @@
 # - Plato: https://github.com/baskerville/plato/blob/master/doc/GUIDE.md
 # - Vlasovsoft: https://wiki.vlasovsoft.net/doku.php?id=en:installation
 #
-# Note: If you are embedding a NickelMenu config in your own mod, please name it
+# Note: If you are embedding a Nickelite config in your own mod, please name it
 # something unique to avoid overwriting someone's existing configuration. In
-# addition, please do not include NickelMenu itself in it unless you are
+# addition, please do not include Nickelite itself in it unless you are
 # planning to update it as new releases are made.
 #
 # Note: Do not edit this file directly, as it will be overwritten when updating
-# NickelMenu.
+# Nickelite.

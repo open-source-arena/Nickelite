@@ -338,10 +338,11 @@ nm_config_t *nm_config_parse(nm_config_file_t *files) {
         cfgfile = NULL;
     }
 
+#if NM_QT_MAJOR < 6
     if (!state.cfg_c) {
         if ((ret = nm_config_parse__append_item(&state, &(nm_menu_item_t){
             .loc    = NM_MENU_LOCATION(main),
-            .lbl    = "NickelMenu",
+            .lbl    = "Nickelite",
             .action = NULL,
         }))) RETERR("error appending default item to empty config: %s", nm_config_parse__strerror(ret));
 
@@ -353,6 +354,7 @@ nm_config_t *nm_config_parse(nm_config_file_t *files) {
             .next       = NULL,
         }))) RETERR("error appending default action to empty config: %s", nm_config_parse__strerror(ret));
     }
+#endif
 
     #define X(name) \
     size_t c_##name = 0;
@@ -793,7 +795,7 @@ nm_menu_item_t **nm_config_get_menu(nm_config_t *cfg, size_t *n_out) {
         if (cur->type == NM_CONFIG_TYPE_MENU_ITEM)
             (*n_out)++;
 
-    nm_menu_item_t **it = calloc(*n_out, sizeof(nm_menu_item_t*));
+    nm_menu_item_t **it = calloc(*n_out ? *n_out : 1, sizeof(nm_menu_item_t*));
     if (!it)
         return NULL;
 
@@ -934,8 +936,9 @@ int nm_global_config_update() {
 
     if (state == 0) {
         NM_LOG("global: parsing new config");
+        nm_err_set(NULL);
         nm_config_t *cfg = nm_config_parse(nm_global_menu_config_files);
-        if (!cfg) {
+        if (!cfg && nm_err_peek()) {
             const char *err = nm_err();
             NM_LOG("... error: %s", err);
             NM_LOG("global: freeing old config and replacing with error item");

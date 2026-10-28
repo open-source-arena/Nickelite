@@ -1,4 +1,4 @@
-# NickelMenu v0.6.0 compared with NickelMenuNG on Kobo 6
+# Upstream NickelMenu v0.6.0 compared with Nickelite 1.0.0 on Kobo 5+
 
 This inventory uses the upstream [v0.6.0 documentation](https://github.com/pgaskin/NickelMenu/tree/v0.6.0), its tagged `Makefile` and source, plus this branch's action registry and the [physical compatibility report](firmware-6.0.279225.md). “Implemented” means the action exists and checks its runtime dependencies; it does not mean every subaction was tested on the N365. The physical results below apply to Clara BW (N365) on 6.0.279225.
 
@@ -17,16 +17,16 @@ reinstall if menu entries disappear after a reboot.
 
 Firmware 6.0.279225 includes a full root filesystem image without that
 `imageformats` directory. Applying it removed the library, while the onboard
-configuration survived. Reinstalling the Qt 6 `Kobo.tgz` restored NickelMenu
+configuration survived. Reinstalling the Qt 6 `Kobo.tgz` restored Nickelite
 on the physical N365. The package filename and extraction root differ from
 the older `KoboRoot.tgz`; neither version has a guaranteed survival mechanism
 for a full-rootfs replacement.
 
 ## Feature coverage
 
-| Older v0.6.0 feature | NickelMenuNG on 6.0.279225 | How to enable or limit it |
+| Older v0.6.0 feature | Nickelite on 6.0.279225 | How to enable or limit it |
 |---|---|---|
-| Main NickelMenu tab; reader, browser, library, selection, and selection-search menus | Implemented; main tab physically verified. Other menu locations retain their hooks but need a physical check on this firmware. | Add `menu_item` entries in `.adds/nm`; main tab is automatic. |
+| Main menu tab; reader, browser, library, selection, and selection-search menus | Implemented; main tab physically verified. Other menu locations retain their hooks but need a physical check on this firmware. | Add `menu_item` entries in `.adds/nm`; main tab is automatic. |
 | Menu labels, ordering, separators, custom tab label/icons, and stock-tab visibility | Implemented from existing config and `experimental` options. | Configure in `.adds/nm`; some options need a reboot. |
 | Action chains: success, failure, always, and `skip` | Implemented; disabled features fail normally so `chain_failure` can run. | Configure chains; `skip` stays available for recovery. |
 | Selection substitution and transforms | Implemented, including the corrected `u` and `x` flags. | Use selection menu entries. |
@@ -50,7 +50,7 @@ for a full-rootfs replacement.
 | Bluetooth actions | **Missing on Qt 6**; action returns an unsupported error. | Needs a new Qt 6 implementation and hardware checks. |
 | Pocket library and Reading Life awards routes | **Missing on Qt 6**; routes return an unsupported error. | Firmware no longer exposes the old routes; Settings cannot enable them. |
 
-The built-in **NickelMenu Settings** view has **Shortcuts**, **Menu items**, and
+The built-in **Nickelite Settings** view has **Shortcuts**, **Menu items**, and
 **Permissions** tabs. Shortcuts generate or remove ready-made menu items for
 dark mode, screenshots, rotation, Dropbox, Google Drive, Wi-Fi, Sleep, Restart,
 and Power off. Editing a generated item makes it a custom item; the shortcut
@@ -59,7 +59,7 @@ above. All permissions default to on. Apply changes writes the hidden
 `.adds/nm/.features.ini` file on onboard storage; Back or another bottom tab
 asks before discarding unsaved changes.
 Items whose actions are blocked by a permission appear dimmed and cannot be
-activated in NickelMenu's menus. If any action in a chain is blocked, the whole
+activated in Nickelite's menus. If any action in a chain is blocked, the whole
 item is disabled. Re-enabling the permission restores the item when the menu is
 next opened.
 The Menu items editor appends ` *` to blocked rows and shows the explanation
@@ -75,14 +75,14 @@ choices persisted between openings. A disabled action has passed the 5.18
 simulator check. On the physical N365, turning Dropbox off blocked its menu
 action with the expected message and left the Kobo responsive; Dropbox was
 then turned back on.
-Turning a group off stops its NickelMenu action and displays a clear error,
+Turning a group off stops its Nickelite action and displays a clear error,
 including inside a chain. It does not change Kobo's own feature settings or
 erase a provider link. Delete `.features.ini` to restore all defaults.
 Debug actions, chaining and uninstall remain available so a bad choice cannot
 lock the recovery path. This view does not turn missing Qt 6 actions into
 working actions.
 
-The **Menu items** tab reads the same `.adds/nm` files as NickelMenu. It shows
+The **Menu items** tab reads the same `.adds/nm` files as Nickelite. It shows
 hand-written `menu_item` entries and writes changes back to their source file;
 new entries go to `zz-nm-settings.conf`. It validates the entire config before
 and after saving and refuses to overwrite a file changed while the view was
@@ -95,7 +95,7 @@ and removing a chained item without a parse error. These UI edits have not yet
 been tried on the physical N365. The 6.0.279225 simulator also opened the
 two-tab editor and displayed it on a fresh, empty configuration. A later
 native full-screen Settings view passed on the 6.0.279225 simulator: the
-NickelMenu navigation tab was active, Kobo's Back button returned to the
+Nickelite navigation tab was active, Kobo's Back button returned to the
 previous tab, Kobo's keyboard entered text, and the native menu selector saved
 `reader` to the config file. The first native view passed a physical touchscreen
 check. Its revised layout and discard flow passed 5.18 and 6.0 simulator checks

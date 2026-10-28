@@ -1,7 +1,7 @@
 # Local Nickel userspace simulator
 
 The original local test ran genuine Kobo **6.0.274403** Nickel under QEMU ARM
-user-mode emulation with NickelMenuNG installed. It exercised the native UI,
+user-mode emulation with the project now called Nickelite installed. It exercised the native UI,
 plugin loading and selected actions. This is a userspace approximation, not a
 booted Kobo board. See [action results](../action-compatibility-6.md) and
 [full-system feasibility](../emulator-board-feasibility.md).
@@ -234,7 +234,7 @@ Create the following text file as `.adds/nm/simulator` in the guest's mounted
 user-storage directory, then restart the container:
 
 ```text
-menu_item:main:Simulator check:dbg_msg:NickelMenuNG is running in the isolated QEMU guest.
+menu_item:main:Simulator check:dbg_msg:Nickelite is running in the isolated QEMU guest.
 ```
 
 Activate **NickelMenu → Simulator check** and confirm the native dialog. This

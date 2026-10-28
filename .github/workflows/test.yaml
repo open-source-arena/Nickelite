@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: NickelMenu / Symbols
+    name: Nickelite / Symbols
     runs-on: ubuntu-latest
     steps:
     - name: Checkout

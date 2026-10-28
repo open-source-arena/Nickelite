@@ -45,6 +45,13 @@ int main(int argc, char **argv) {
     delete replacement;
 
 #if NM_QT_MAJOR >= 6
+    nm_err_set(nullptr);
+    assert(!nm_config_parse(nullptr) && !nm_err_peek());
+    size_t emptyCount = 1;
+    auto **emptyItems = nm_config_get_menu(nullptr, &emptyCount);
+    assert(emptyItems && emptyCount == 0);
+    free(emptyItems);
+
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_open), "library:dropbox"), "dropbox"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_open), "library:gdrive"), "gdrive"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_open), "library:authors"), "navigation"));

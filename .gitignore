@@ -26,6 +26,8 @@ test.syms
 /dist/
 !/dist/
 /dist/*
+!/dist/1.0.0/
+!/dist/1.0.0/*
 !/dist/firmware-6.0.279225/
 !/dist/firmware-6.0.279225/*
 /docs/evidence/
