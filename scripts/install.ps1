@@ -17,8 +17,8 @@ try {
     if ($Package) {
         Copy-Item $Package $zip
     } else {
-        if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw 'Install GitHub CLI (gh) and authenticate for the private repository.' }
-        gh release download "v$version" -R Sojaner/Nickelite -p $asset -p SHA256SUMS -D $temp
+        if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw 'Install GitHub CLI (gh) to download the public release.' }
+        gh release download "v$version" -R open-source-arena/Nickelite -p $asset -p SHA256SUMS -D $temp
         if ($LASTEXITCODE -ne 0) { throw 'Package download failed.' }
         $line = Get-Content (Join-Path $temp 'SHA256SUMS') | Where-Object { $_ -match [regex]::Escape($asset) }
         if (-not $line) { throw 'Release checksum is missing.' }

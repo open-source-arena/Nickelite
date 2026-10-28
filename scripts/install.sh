@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo=Sojaner/Nickelite
+repo=open-source-arena/Nickelite
 version=1.0.0
 mount=${1:?Usage: install.sh /path/to/KOBOeReader [versioned-package.zip]}
 [ -f "$mount/.kobo/version" ] || { echo 'Kobo storage is not mounted at that path.' >&2; exit 1; }
@@ -16,7 +16,7 @@ trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 if [ "${2:-}" ]; then
   cp "$2" "$tmp/$asset"
 else
-  command -v gh >/dev/null || { echo 'Install GitHub CLI (gh) and authenticate for the private repository.' >&2; exit 1; }
+  command -v gh >/dev/null || { echo 'Install GitHub CLI (gh) to download the public release.' >&2; exit 1; }
   gh release download "v$version" -R "$repo" -p "$asset" -p SHA256SUMS -D "$tmp"
   (cd "$tmp" && if command -v sha256sum >/dev/null; then sha256sum -c --ignore-missing SHA256SUMS; else shasum -a 256 -c SHA256SUMS | grep "$asset: OK"; fi)
 fi
