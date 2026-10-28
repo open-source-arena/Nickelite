@@ -1073,6 +1073,7 @@ static void nm_show_feature_settings() {
     QObject::connect(menuItems->model(), &QAbstractItemModel::dataChanged, view, refreshQuick);
     auto *menuButtons = new QGridLayout;
     menuButtons->setHorizontalSpacing(6);
+    menuButtons->setVerticalSpacing(6);
     auto *add = new QPushButton(QStringLiteral("Add menu item"), menuPage);
     auto *edit = new QPushButton(QStringLiteral("Edit selected"), menuPage);
     auto *duplicate = new QPushButton(QStringLiteral("Duplicate selected"), menuPage);

@@ -1,4 +1,4 @@
-# Upstream NickelMenu v0.6.0 compared with Nickelite 1.1.0 on Kobo 5+
+# Upstream NickelMenu v0.6.0 compared with Nickelite 1.1.1 on Kobo 5+
 
 This inventory uses the upstream [v0.6.0 documentation](https://github.com/pgaskin/NickelMenu/tree/v0.6.0), its tagged `Makefile` and source, plus this branch's action registry and the [physical compatibility report](firmware-6.0.279225.md). “Implemented” means the action exists and checks its runtime dependencies; it does not mean every subaction was tested on the N365. The physical results below apply to Clara BW (N365) on 6.0.279225.
 

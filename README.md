@@ -1,4 +1,4 @@
-# Nickelite 1.1.0
+# Nickelite 1.1.1
 
 Nickelite adds a configurable menu and a native Settings view to Kobo's Nickel reader software. It runs on the **Qt 6 based Kobo firmware 5+**. Firmware 4.x is outside this project's support scope.
 
@@ -22,14 +22,14 @@ Kobo Clara BW (N365) does not normally show Dropbox or Google Drive in its More 
 
 | Firmware | Package | Evidence |
 | --- | --- | --- |
-| 5.18.270971 | `Nickelite-1.1.0-firmware-5.18.270971.zip` | Menu and Settings tested with a preceding editor candidate in QEMU; the 1.1.0 build loads its tab and passes ARM compatibility tests. Cloud access is not enabled for this firmware. |
-| 6.0.279225 | `Nickelite-1.1.0-firmware-6.0.279225.zip` | Menu and Settings tested in QEMU, including the KOReader switch and generated menu entry; cloud lists, downloads, and USB actions tested on a physical Clara BW (N365) with preceding candidates. |
+| 5.18.270971 | `Nickelite-1.1.1-firmware-5.18.270971.zip` | Menu and Settings tested with a preceding editor candidate in QEMU; the 1.1.1 build loads its tab and passes ARM compatibility tests. Cloud access is not enabled for this firmware. |
+| 6.0.279225 | `Nickelite-1.1.1-firmware-6.0.279225.zip` | Menu and Settings tested in QEMU, including the KOReader switch and generated menu entry; cloud lists, downloads, and USB actions tested on a physical Clara BW (N365) with preceding candidates. |
 
-These are the **pinned firmware builds** for the 1.1.0 downloads. Other firmware 5.x/6.x builds and Kobo models need separate compatibility checks. The only physical model tested so far is **Kobo Clara BW**. The simulator runs genuine Nickel in QEMU userspace; it does not emulate Kobo hardware. See the [compatibility matrix](docs/feature-matrix.md), [6.0 results](docs/firmware-6.0.279225.md), and [simulator guide](docs/emulator/real-cloud.md).
+These are the **pinned firmware builds** for the 1.1.1 downloads. Other firmware 5.x/6.x builds and Kobo models need separate compatibility checks. The only physical model tested so far is **Kobo Clara BW**. The simulator runs genuine Nickel in QEMU userspace; it does not emulate Kobo hardware. See the [compatibility matrix](docs/feature-matrix.md), [6.0 results](docs/firmware-6.0.279225.md), and [simulator guide](docs/emulator/real-cloud.md).
 
 ## Download and install
 
-Download the matching versioned ZIP and `SHA256SUMS` from the [public v1.1.0 release](https://github.com/open-source-arena/Nickelite/releases/tag/v1.1.0). Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
+Download the matching versioned ZIP and `SHA256SUMS` from the [public v1.1.1 release](https://github.com/open-source-arena/Nickelite/releases/tag/v1.1.1). Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
 
 **Automated install:** connect the Kobo by USB, tap **Connect**, and find its mounted storage path. Install [GitHub CLI](https://cli.github.com/) to download the release automatically; sign-in is not required for this public repository. Run one of these commands from a clone of this repository:
 
@@ -75,7 +75,7 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
 ./scripts/package-release.sh
 ```
 
-The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.1.0`. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
+The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.1.1`. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
 
 ## Origins and license
 

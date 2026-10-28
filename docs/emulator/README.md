@@ -6,6 +6,15 @@ plugin loading and selected actions. This is a userspace approximation, not a
 booted Kobo board. See [action results](../action-compatibility-6.md) and
 [full-system feasibility](../emulator-board-feasibility.md).
 
+## Nickelite 1.1.1 screenshot check (2026-10-29)
+
+The Shortcuts, Menu items, and Permissions screenshots were recaptured on the
+6.0.279225 guest with the 1.1.1 UI. The Menu items button grid now explicitly
+uses 6 px vertical spacing. A temporary simulator-only startup hook opened
+Settings because the existing guest was asleep; that hook was removed before
+building the release package. The main menu and native More screenshots still
+match the current default menu and cloud entries.
+
 ## Nickelite 1.1.0 KOReader shortcut check (2026-10-29)
 
 The 1.1.0 binary loaded on the 6.0.279225 guest. Shortcuts displayed the new

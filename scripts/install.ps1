@@ -3,7 +3,7 @@ param(
     [string]$Package
 )
 $ErrorActionPreference = 'Stop'
-$version = '1.1.0'
+$version = '1.1.1'
 $root = (Resolve-Path $KoboDrive).Path
 $versionFile = Join-Path $root '.kobo/version'
 if (-not (Test-Path $versionFile)) { throw 'Kobo storage is not mounted at that path.' }
