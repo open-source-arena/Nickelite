@@ -455,13 +455,17 @@ static void nm_group_ui_items(QListWidget *list) {
                 ? QStringLiteral("NickelMenu") : nm_choice_label(target));
             heading->setData(Qt::UserRole, QStringList{QString(), QStringLiteral("-1"), target,
                 QString(), QString(), QString()});
-            heading->setFlags(Qt::ItemIsEnabled);
+            heading->setFlags(Qt::NoItemFlags);
             heading->setBackground(QColor(QStringLiteral("#dedede")));
             QFont font = list->font();
             font.setPixelSize(23);
             font.setBold(true);
             heading->setFont(font);
             list->addItem(heading);
+            auto *bar = new QLabel(heading->text(), list);
+            bar->setStyleSheet(QStringLiteral("background: #dedede; color: black; padding: 7px 12px; font-size: 23px; font-weight: bold;"));
+            bar->setAttribute(Qt::WA_TransparentForMouseEvents);
+            list->setItemWidget(heading, bar);
             previous = target;
         }
         list->addItem(item);
@@ -1072,17 +1076,18 @@ static void nm_show_feature_settings() {
     menuLayout->addLayout(menuButtons);
     QObject::connect(menuItems, &QListWidget::currentItemChanged, view,
         [menuItems, edit, duplicate, remove, moveUp, moveDown, editable](QListWidgetItem *item) {
-            edit->setEnabled(editable && item);
-            duplicate->setEnabled(editable && item);
-            remove->setEnabled(editable && item);
-            const int row = item ? menuItems->row(item) : -1;
             const QString source = item ? item->data(Qt::UserRole).toStringList().value(0) : QString();
+            const bool actualItem = editable && !source.isEmpty();
+            edit->setEnabled(actualItem);
+            duplicate->setEnabled(actualItem);
+            remove->setEnabled(actualItem);
+            const int row = item ? menuItems->row(item) : -1;
             const QString target = item ? item->data(Qt::UserRole).toStringList().value(2) : QString();
-            moveUp->setEnabled(editable && !source.isEmpty() && row > 0
+            moveUp->setEnabled(actualItem && row > 0
                 && menuItems->item(row - 1)->data(Qt::UserRole).toStringList().value(0) == source
                 && menuItems->item(row - 1)->data(Qt::UserRole).toStringList().value(2) == target);
-            moveDown->setEnabled(editable && row >= 0 && row + 1 < menuItems->count()
-                && !source.isEmpty() && menuItems->item(row + 1)->data(Qt::UserRole).toStringList().value(0) == source
+            moveDown->setEnabled(actualItem && row >= 0 && row + 1 < menuItems->count()
+                && menuItems->item(row + 1)->data(Qt::UserRole).toStringList().value(0) == source
                 && menuItems->item(row + 1)->data(Qt::UserRole).toStringList().value(2) == target);
         });
     tabs->insertTab(1, menuPage, QStringLiteral("Menu items"));
