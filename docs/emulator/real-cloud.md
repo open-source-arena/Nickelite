@@ -23,8 +23,8 @@ Allocate several gigabytes for the firmware, Qt SDK and image. Store the work
 directory **outside this Git checkout**: its `onboard` subdirectory holds the
 Kobo account and cloud tokens after sign-in. Never commit, copy or publish it.
 
-Clone the private `Sojaner/Nickelite` repository using your normal GitHub
-access and check out `main`. All commands below run
+Clone the public [open-source-arena/Nickelite](https://github.com/open-source-arena/Nickelite)
+repository and check out `main`. All commands below run
 from that checkout's root. Set your own work and noVNC paths; use a local,
 dedicated directory for each fresh guest:
 

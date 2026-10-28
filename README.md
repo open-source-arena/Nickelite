@@ -29,9 +29,9 @@ These are the **pinned firmware builds** for the 1.0.0 downloads. Other firmware
 
 ## Download and install
 
-Download the matching versioned ZIP and `SHA256SUMS` from the [v1.0.0 release](https://github.com/Sojaner/Nickelite/releases/tag/v1.0.0). This repository is private, so downloads require GitHub access to it. Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
+Download the matching versioned ZIP and `SHA256SUMS` from the [public v1.0.0 release](https://github.com/open-source-arena/Nickelite/releases/tag/v1.0.0). Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
 
-**Automated install:** connect the Kobo by USB, tap **Connect**, and find its mounted storage path. Install [GitHub CLI](https://cli.github.com/) and sign in with `gh auth login` if downloading from the private release. Run one of these commands from a clone of this repository:
+**Automated install:** connect the Kobo by USB, tap **Connect**, and find its mounted storage path. Install [GitHub CLI](https://cli.github.com/) to download the release automatically; sign-in is not required for this public repository. Run one of these commands from a clone of this repository:
 
 The release also offers `install.sh` and `install.ps1` as separate downloads, so a clone is optional.
 
