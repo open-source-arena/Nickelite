@@ -98,8 +98,10 @@ The startup wrapper creates `.kobo/Kobo/Kobo eReader.conf` only when absent.
 It sets `SideloadedMode=false` for the normal Kobo account setup flow. Enter
 your own account in the **simulated Kobo UI**. No password, link code, account
 database, token, or browser profile belongs in this repository. The Wi-Fi icon
-is a compatibility state, not an emulated radio. If the official TLS probe
-fails, the shim stays disabled and Kobo's normal Wi-Fi scan cannot complete.
+is not an emulated radio: on the fresh 6.0.279225 guest it showed a crossed-out
+symbol and "No Wi Fi networks found" even while the TLS probe succeeded and
+the official cloud device-link page loaded. If the official TLS probe fails,
+the shim stays disabled and Kobo's normal Wi-Fi scan cannot complete.
 
 ## Link and exercise the clouds
 
@@ -109,6 +111,13 @@ guest at the official `kobo.com/dropbox` or `kobo.com/googledrive` page in your
 browser. Review each provider's access scope before approving it. The guest
 should advance to a registration success screen and then the cloud file list.
 Do not copy device codes or screenshots containing account details into Git.
+
+On 2026-10-28, a fresh 6.0.279225 guest completed Kobo sign-in, displayed
+both stock cloud entries in More, and opened each provider's Get Started page
+through its NickelMenu shortcut. Google Drive reached the device-link code
+page. Turning the Dropbox shortcut off in NickelMenu Settings removed its menu
+row; turning it back on restored one row. This fresh guest was not linked to
+the providers, so its cloud file lists and downloads were not retested.
 
 For the repeat-entry check, leave each file list using its back arrow, open
 the same service again, then switch to the other service. Check that each file
