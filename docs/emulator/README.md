@@ -117,10 +117,15 @@ On 2026-10-28, the 6.0.279225 simulator was updated to use the firmware's
 controls in NickelMenu Settings. A VNC
 mouse drag scrolled Permissions by pixels; the selected Menu items row reversed
 the whole row to white on black. The NickelMenu tab first showed four bars;
-the supplied 42 × 42 PNG then replaced that icon as the default. Because
+the supplied 42 × 42 PNG then replaced that icon as the default. The tab now
+uses the supplied inactive and active PNGs for their respective states. Because
 the VNC platform has a fixed portrait framebuffer, Rotate screen now reports
 that rotation is unavailable there and leaves the view uncropped. The revised
 controls still need a physical touch check before installation on the N365.
+
+The same two-icon build booted on the 5.18 guest and rendered the inactive tab
+icon. That guest did not respond to pointer clicks, so its active state was not
+visually confirmed there. The 6.0.279225 guest displayed both states.
 The arrow scrollbar's native layout was adjusted to give the track more of the
 list height. A VNC drag reached Book rescan without paging, and the down and up
 arrows moved the list to its last items and back to the start. A fresh 5.18

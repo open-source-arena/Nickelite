@@ -1347,8 +1347,8 @@ static const char *nm_main_menu_config(int index, const char *option) {
     return nm_global_config_experimental(buf);
 }
 
-static bool nm_write_default_icon(const char *path) {
-    const nh_resource &resource = nh_embedded_resources[0];
+static bool nm_write_default_icon(const char *path, int resourceIndex) {
+    const nh_resource &resource = nh_embedded_resources[resourceIndex];
     const QImage icon = QImage::fromData(resource.data, static_cast<int>(resource.size), "PNG");
     return !icon.isNull() && icon.save(QString::fromLatin1(path), "PNG");
 }
@@ -1449,13 +1449,15 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
     }
 
     MainNavButton_MainNavButton(btn, parent);
-    const char *defaultIcon = "/tmp/nm_menu_default_icon.png";
-    const bool customIcon = nm_write_default_icon(defaultIcon);
+    const char *inactiveIcon = "/tmp/nm_menu_inactive_icon.png";
+    const char *activeIcon = "/tmp/nm_menu_active_icon.png";
+    const bool hasInactiveIcon = nm_write_default_icon(inactiveIcon, 0);
+    const bool hasActiveIcon = nm_write_default_icon(activeIcon, 1);
     main_nav_button_configure(btn,
         nm_global_config_experimental("menu_main_15505_label") ?: "NickelMenu",
-        nm_global_config_experimental("menu_main_15505_icon") ?: (customIcon ? defaultIcon : nullptr),
+        nm_global_config_experimental("menu_main_15505_icon") ?: (hasInactiveIcon ? inactiveIcon : nullptr),
         ":/images/home/main_nav_more.png",
-        nm_global_config_experimental("menu_main_15505_icon_active") ?: (customIcon ? defaultIcon : nullptr),
+        nm_global_config_experimental("menu_main_15505_icon_active") ?: (hasActiveIcon ? activeIcon : nullptr),
         ":/images/home/main_nav_more_active.png"
     );
     btn->setObjectName("nmButton");

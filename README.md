@@ -82,8 +82,9 @@ unsaved changes, including changes in the item editor. Its text fields use
 Kobo's on-screen keyboard. All three lists use Kobo's arrow scrollbar and touch
 flicking on smaller screens. Shortcuts and permissions use Kobo's toggle
 switches. The selected menu item is shown as white text across a black row.
-The NickelMenu tab uses the included [42 × 42 transparent PNG](res/icon/NickelMenu.png)
-unless a custom icon is configured.
+The NickelMenu tab uses separate [inactive](res/icon/NickelMenu-inactive.png)
+and [active](res/icon/NickelMenu-active.png) 42 × 42 transparent PNGs unless
+custom icons are configured.
 System dialogs can appear above Settings. The USB
 connection action remains available as a custom menu item; it is not a
 ready-made shortcut because it changes Kobo's storage connection state. Back up `.adds/nm` before
