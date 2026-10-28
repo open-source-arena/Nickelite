@@ -16,7 +16,7 @@ Simulator screenshots (use Ctrl-click or Command-click to open one in a new tab)
 - Uses separate active and inactive tab icons.
 - Displays its version at the bottom of Settings. A firmware update may remove the plugin; reinstalling the package preserves the user config directory.
 
-On the tested Clara BW firmware, Nickelite also enables Kobo's own **My Dropbox** and **My Google Drive** entries in the native More screen:
+Kobo Clara BW (N365) does not normally show Dropbox or Google Drive in its More screen. On the tested 6.0.279225 firmware, Nickelite enables Kobo's built-in cloud views and their **My Dropbox** and **My Google Drive** entries in the native More screen:
 
 <p align="center"><img src="docs/screenshots/native-more-cloud.png" alt="Kobo More screen with My Dropbox and My Google Drive" width="50%"></p>
 
