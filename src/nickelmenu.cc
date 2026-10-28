@@ -888,7 +888,7 @@ static void nm_show_feature_settings() {
     content->setFont(uiFont);
     auto *layout = new QVBoxLayout(content);
     layout->setContentsMargins(22, 8, 22, 18);
-    layout->setSpacing(18);
+    layout->setSpacing(6);
     auto *tabs = new QTabWidget(content);
     tabs->tabBar()->setFocusPolicy(Qt::NoFocus);
     tabs->setStyleSheet(QStringLiteral(
