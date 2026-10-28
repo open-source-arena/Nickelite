@@ -58,6 +58,10 @@ switch no longer owns it. Permissions control the supported action groups
 above. All permissions default to on. Apply changes writes the hidden
 `.adds/nm/.features.ini` file on onboard storage; Back or another bottom tab
 asks before discarding unsaved changes.
+Items whose actions are blocked by a permission appear dimmed and cannot be
+activated in NickelMenu's menus. If any action in a chain is blocked, the whole
+item is disabled. Re-enabling the permission restores the item when the menu is
+next opened.
 Long lists page in one step per swipe or scrollbar tap, regardless of Kobo model
 or screen size. The native scrollbar appears only when a list has multiple pages.
 The USB connection action is available in the custom item

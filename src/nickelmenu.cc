@@ -25,6 +25,7 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QFormLayout>
+#include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -145,6 +146,23 @@ static const char *nm_feature_label(const char *key) {
     for (const auto &feature : nm_features)
         if (!std::strcmp(feature.key, key)) return feature.label;
     return key;
+}
+
+static bool nm_item_permissions_enabled(const nm_menu_item_t *item) {
+    for (const nm_menu_action_t *action = item->action; action; action = action->next) {
+        const char *feature = nm_feature_for_action(action->act, action->arg);
+        if (feature && !nm_feature_enabled(feature)) return false;
+    }
+    return true;
+}
+
+static void nm_set_menu_widget_enabled(QWidget *widget, bool enabled) {
+    widget->setEnabled(enabled);
+    if (!enabled) {
+        auto *dim = new QGraphicsOpacityEffect(widget);
+        dim->setOpacity(0.45);
+        widget->setGraphicsEffect(dim);
+    }
 }
 
 static const QString nm_ui_items_path = QLatin1String(NM_CONFIG_DIR "/zz-nm-settings.conf");
@@ -1617,12 +1635,17 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
             MenuTextItem_MenuTextItem(mti, menu, false, true);
             MenuTextItem_setText(mti, QString::fromUtf8(label));
             MenuTextItem_registerForTapGestures(mti); // this only makes the MenuTextItem::tapped signal connect so it highlights on tap, doesn't apply to the QAction::triggered below (which needs another GestureReceiver somewhere)
+            bool enabled = true;
+#if NM_QT_MAJOR >= 6
+            if (!featureSettings) enabled = nm_item_permissions_enabled(it);
+            nm_set_menu_widget_enabled(mti, enabled);
+#endif
 
             // based on _ZN22AbstractMenuController12createActionEP5QMenuP7QWidgetbbb
 
             QWidgetAction *ac = new QWidgetAction(menu);
             ac->setDefaultWidget(mti);
-            ac->setEnabled(true);
+            ac->setEnabled(enabled);
 
             menu->addAction(ac);
 
@@ -1643,7 +1666,8 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
             // event handler
 
-            QObject::connect(ac, &QAction::triggered, [it, featureSettings](bool) {
+            QObject::connect(ac, &QAction::triggered, [it, featureSettings, ac](bool) {
+                if (!ac->isEnabled()) return;
                 if (featureSettings) {
 #if NM_QT_MAJOR >= 6
                     QTimer::singleShot(250, [] { nm_show_feature_settings(); });
@@ -1768,6 +1792,9 @@ static void nm_selection_inject(SelectionMenuController *_this, SelectionMenuVie
         MenuTextItem_MenuTextItem(mti, smv, false, true);
         MenuTextItem_setText(mti, QString::fromUtf8(it->lbl));
         MenuTextItem_registerForTapGestures(mti);
+#if NM_QT_MAJOR >= 6
+        nm_set_menu_widget_enabled(mti, nm_item_permissions_enabled(it));
+#endif
 
         // based on _ZN23SelectionMenuController18setupSearchOptionsEb and _ZN23SelectionMenuController11addMenuItemEP17SelectionMenuViewP12MenuTextItemPKc, plus some custom stuff for better compatibility
 
@@ -1779,6 +1806,9 @@ static void nm_selection_inject(SelectionMenuController *_this, SelectionMenuVie
         sh->setVisible(false);
 
         QObject::connect(sh, &QPushButton::pressed, [_this, it]() {
+#if NM_QT_MAJOR >= 6
+            if (!nm_item_permissions_enabled(it)) return;
+#endif
             NM_LOG("item '%s' pressed...", it->lbl);
             if (!SelectionMenuController_lookupWikipedia) {
                 // Firmware 6 keeps the live selection in the reader, while the
@@ -1960,10 +1990,19 @@ void _nm_menu_inject(void *nmc, QMenu *menu, nm_menu_location_t loc, int at) {
 
         MenuTextItem* item = AbstractNickelMenuController_createMenuTextItem(nmc, menu, QString::fromUtf8(it->lbl), false, false, "");
         if (!item) continue;
-        QAction* action = AbstractNickelMenuController_createAction_before(before, loc, i == items_n-1, nmc, menu, item, true, true, true);
+        bool enabled = true;
+#if NM_QT_MAJOR >= 6
+        enabled = nm_item_permissions_enabled(it);
+#endif
+        QAction* action = AbstractNickelMenuController_createAction_before(before, loc, i == items_n-1, nmc, menu, item, true, enabled, true);
 
         if (!action) { item->deleteLater(); continue; }
-        QObject::connect(action, &QAction::triggered, [it](bool){
+        action->setEnabled(enabled);
+#if NM_QT_MAJOR >= 6
+        nm_set_menu_widget_enabled(item, enabled);
+#endif
+        QObject::connect(action, &QAction::triggered, [it, action](bool){
+            if (!action->isEnabled()) return;
             NM_LOG("item '%s' pressed...", it->lbl);
             nm_menu_item_do(it, NULL, NULL);
             NM_LOG("done");

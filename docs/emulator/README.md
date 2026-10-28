@@ -137,6 +137,10 @@ gestures and controls still need a physical e-ink latency check.
 The final paginated build also booted on the 5.18 guest and showed the
 NickelMenu tab. Pointer input remained unresponsive there, so its Settings
 controls could not be exercised on that guest.
+On the 6.0.279225 guest, turning Dropbox's action permission off dimmed its
+existing menu entry. Tapping the dimmed entry left the menu open and did not
+run the action or show an error. Turning the permission back on restored the
+normal label when the menu reopened.
 In an earlier build, the arrow scrollbar's native layout was adjusted to give the track more of the
 list height. A VNC drag reached Book rescan without paging, and the down and up
 arrows moved the list to its last items and back to the start. A fresh 5.18
