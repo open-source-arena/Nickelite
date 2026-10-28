@@ -909,7 +909,7 @@ static void nm_show_feature_settings() {
     auto *permissionsPageNumber = new QLabel(permissionsPage);
     permissionsPageNumber->setFont(uiFont);
     permissionsLayout->addWidget(permissionsPageNumber, 0, Qt::AlignRight);
-    auto *permissionsPager = new NmPagedFrame(permissionsPage, permissionsPageNumber, 78);
+    auto *permissionsPager = new NmPagedFrame(permissionsPage, permissionsPageNumber, 60);
     permissionsLayout->addWidget(permissionsPager->widget(), 1);
     auto *featureList = new QWidget(permissionsPage);
     auto *rows = new QVBoxLayout(featureList);
@@ -921,7 +921,7 @@ static void nm_show_feature_settings() {
         const auto switchRow = nm_native_switch(featureList, QLatin1String(feature.label));
         auto *box = switchRow.state;
         box->setChecked(nm_feature_enabled(feature.key));
-        switchRow.row->setMinimumHeight(70);
+        switchRow.row->setMinimumHeight(60);
         box->setFocusPolicy(Qt::NoFocus);
         QFont font = switchRow.row->font();
         font.setPixelSize(26);
@@ -947,6 +947,7 @@ static void nm_show_feature_settings() {
     menuItems->setFont(uiFont);
     menuItems->setSpacing(0);
     menuItems->setFrameShape(QFrame::NoFrame);
+    menuItems->setStyleSheet(QStringLiteral("QListWidget { border-top: 1px solid #aaa; }"));
     auto *menuPager = new NmPagedFrame(menuPage, menuPageNumber, 76);
     menuPager->setList(menuItems);
     menuLayout->addWidget(menuPager->widget(), 1);
@@ -1047,7 +1048,7 @@ static void nm_show_feature_settings() {
     QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view, refreshQuick);
     QObject::connect(menuItems->model(), &QAbstractItemModel::rowsRemoved, view, refreshQuick);
     QObject::connect(menuItems->model(), &QAbstractItemModel::dataChanged, view, refreshQuick);
-    auto *menuButtons = new QVBoxLayout;
+    auto *menuButtons = new QGridLayout;
     auto *add = new QPushButton(QStringLiteral("Add menu item"), menuPage);
     auto *edit = new QPushButton(QStringLiteral("Edit selected"), menuPage);
     auto *duplicate = new QPushButton(QStringLiteral("Duplicate selected"), menuPage);
@@ -1056,6 +1057,10 @@ static void nm_show_feature_settings() {
     auto *moveDown = new QPushButton(QStringLiteral("Move down"), menuPage);
     for (auto *button : {add, edit, duplicate, remove, moveUp, moveDown}) {
         nm_native_style_button(button);
+        button->setMinimumHeight(56);
+        QFont font = button->font();
+        font.setPixelSize(25);
+        button->setFont(font);
         button->setEnabled(editable);
     }
     edit->setEnabled(false);
@@ -1063,16 +1068,12 @@ static void nm_show_feature_settings() {
     remove->setEnabled(false);
     moveUp->setEnabled(false);
     moveDown->setEnabled(false);
-    menuButtons->addWidget(add);
-    auto *selectedButtons = new QHBoxLayout;
-    selectedButtons->addWidget(edit);
-    selectedButtons->addWidget(duplicate);
-    selectedButtons->addWidget(remove);
-    menuButtons->addLayout(selectedButtons);
-    auto *moveButtons = new QHBoxLayout;
-    moveButtons->addWidget(moveUp);
-    moveButtons->addWidget(moveDown);
-    menuButtons->addLayout(moveButtons);
+    menuButtons->addWidget(add, 0, 0);
+    menuButtons->addWidget(edit, 0, 1);
+    menuButtons->addWidget(duplicate, 0, 2);
+    menuButtons->addWidget(moveUp, 1, 0);
+    menuButtons->addWidget(moveDown, 1, 1);
+    menuButtons->addWidget(remove, 1, 2);
     menuLayout->addLayout(menuButtons);
     QObject::connect(menuItems, &QListWidget::currentItemChanged, view,
         [menuItems, edit, duplicate, remove, moveUp, moveDown, editable](QListWidgetItem *item) {
