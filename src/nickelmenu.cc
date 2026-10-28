@@ -424,7 +424,7 @@ static QString nm_choice_label(const QString &key) {
 }
 
 static QString nm_ui_item_text(const QStringList &fields) {
-    return fields[3] + QStringLiteral("  ·  ") + nm_choice_label(fields[2]);
+    return fields[3];
 }
 
 static void nm_group_ui_items(QListWidget *list) {
@@ -888,7 +888,7 @@ static void nm_show_feature_settings() {
     content->setFont(uiFont);
     auto *layout = new QVBoxLayout(content);
     layout->setContentsMargins(22, 8, 22, 18);
-    layout->setSpacing(24);
+    layout->setSpacing(12);
     auto *tabs = new QTabWidget(content);
     tabs->tabBar()->setFocusPolicy(Qt::NoFocus);
     tabs->setStyleSheet(QStringLiteral(
@@ -935,7 +935,7 @@ static void nm_show_feature_settings() {
     tabs->addTab(permissionsPage, QStringLiteral("Permissions"));
     auto *menuPage = new QWidget(tabs);
     auto *menuLayout = new QVBoxLayout(menuPage);
-    menuLayout->setContentsMargins(0, 0, 0, 20);
+    menuLayout->setContentsMargins(0, 0, 0, 0);
     auto *menuHeading = new QLabel(QStringLiteral("Manage menu items on different menus"), menuPage);
     menuHeading->setObjectName(QStringLiteral("nmSectionHeading"));
     menuLayout->addWidget(menuHeading);
@@ -962,14 +962,16 @@ static void nm_show_feature_settings() {
     nm_group_ui_items(menuItems);
     menuPager->refresh();
     auto regroupPending = std::make_shared<bool>(false);
-    auto scheduleRegroup = [menuItems, menuPager, regroupPending] {
+    auto refreshAfterRegroup = std::make_shared<std::function<void()>>();
+    auto scheduleRegroup = [menuItems, menuPager, regroupPending, refreshAfterRegroup] {
         if (*regroupPending) return;
         *regroupPending = true;
-        QTimer::singleShot(0, menuItems, [menuItems, menuPager, regroupPending] {
+        QTimer::singleShot(0, menuItems, [menuItems, menuPager, regroupPending, refreshAfterRegroup] {
             *regroupPending = false;
             nm_group_ui_items(menuItems);
             menuPager->refresh();
             if (menuItems->currentRow() >= 0) menuPager->reveal(menuItems->currentRow());
+            if (*refreshAfterRegroup) (*refreshAfterRegroup)();
         });
     };
     QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view, scheduleRegroup);
@@ -1049,6 +1051,7 @@ static void nm_show_feature_settings() {
     QObject::connect(menuItems->model(), &QAbstractItemModel::rowsRemoved, view, refreshQuick);
     QObject::connect(menuItems->model(), &QAbstractItemModel::dataChanged, view, refreshQuick);
     auto *menuButtons = new QGridLayout;
+    menuButtons->setHorizontalSpacing(6);
     auto *add = new QPushButton(QStringLiteral("Add menu item"), menuPage);
     auto *edit = new QPushButton(QStringLiteral("Edit selected"), menuPage);
     auto *duplicate = new QPushButton(QStringLiteral("Duplicate selected"), menuPage);
@@ -1068,11 +1071,11 @@ static void nm_show_feature_settings() {
     remove->setEnabled(false);
     moveUp->setEnabled(false);
     moveDown->setEnabled(false);
-    menuButtons->addWidget(add, 0, 0);
-    menuButtons->addWidget(edit, 0, 1);
-    menuButtons->addWidget(duplicate, 0, 2);
-    menuButtons->addWidget(moveUp, 1, 0);
-    menuButtons->addWidget(moveDown, 1, 1);
+    menuButtons->addWidget(moveUp, 0, 0);
+    menuButtons->addWidget(add, 0, 1);
+    menuButtons->addWidget(edit, 0, 2);
+    menuButtons->addWidget(moveDown, 1, 0);
+    menuButtons->addWidget(duplicate, 1, 1);
     menuButtons->addWidget(remove, 1, 2);
     menuLayout->addLayout(menuButtons);
     QObject::connect(menuItems, &QListWidget::currentItemChanged, view,
@@ -1125,18 +1128,43 @@ static void nm_show_feature_settings() {
     QList<QStringList> initialItems;
     for (int i = 0; i < menuItems->count(); ++i)
         initialItems << menuItems->item(i)->data(Qt::UserRole).toStringList();
-    auto *guard = new NmCloseGuard(view, [boxes, menuItems, initialFeatures, initialItems] {
+    auto isDirty = [boxes, menuItems, initialFeatures, initialItems] {
         for (qsizetype i = 0; i < boxes.size(); ++i)
             if (boxes[i]->isChecked() != initialFeatures[i]) return true;
         if (menuItems->count() != initialItems.size()) return true;
         for (int i = 0; i < menuItems->count(); ++i)
             if (menuItems->item(i)->data(Qt::UserRole).toStringList() != initialItems[i]) return true;
         return false;
-    });
+    };
+    auto *guard = new NmCloseGuard(view, isDirty);
     auto *save = new QPushButton(QStringLiteral("Apply changes"), content);
+    auto *cancel = new QPushButton(QStringLiteral("Cancel"), content);
     nm_native_style_button(save);
-    layout->addWidget(save);
+    nm_native_style_button(cancel);
+    auto *saveRow = new QGridLayout;
+    saveRow->setHorizontalSpacing(6);
+    saveRow->setColumnStretch(0, 1);
+    saveRow->setColumnStretch(1, 1);
+    saveRow->addWidget(save, 0, 0, 1, 2);
+    saveRow->addWidget(cancel, 0, 2);
+    layout->addLayout(saveRow);
+    auto refreshDirty = [isDirty, save, cancel, saveRow] {
+        const bool dirty = isDirty();
+        save->setEnabled(dirty);
+        cancel->setVisible(dirty);
+        saveRow->setColumnStretch(2, dirty ? 1 : 0);
+    };
+    *refreshAfterRegroup = refreshDirty;
+    for (QCheckBox *box : boxes)
+        QObject::connect(box, &QCheckBox::toggled, view, refreshDirty);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view, refreshDirty);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsRemoved, view, refreshDirty);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::dataChanged, view, refreshDirty);
+    QObject::connect(moveUp, &QPushButton::clicked, view, refreshDirty);
+    QObject::connect(moveDown, &QPushButton::clicked, view, refreshDirty);
+    refreshDirty();
     nm_native_set_content(view, content);
+    QObject::connect(cancel, &QPushButton::clicked, view, [view] { view->close(); });
     QObject::connect(save, &QPushButton::clicked, view, [view, boxes, menuItems, editable, snapshots, guard] {
         if (editable && !nm_write_ui_items(menuItems, snapshots)) {
             nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Could not save menu items."));
