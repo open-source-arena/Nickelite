@@ -6,6 +6,8 @@ Simulator screenshots (use Ctrl-click or Command-click to open one in a new tab)
 
 [Menu](docs/screenshots/main-menu.png) · [Shortcuts](docs/screenshots/settings-shortcuts.png) · [Menu items](docs/screenshots/settings-menu-items.png) · [Permissions](docs/screenshots/settings-permissions.png)
 
+<img src="docs/screenshots/settings-shortcuts.png" alt="Nickelite Settings on the Shortcuts tab" width="50%">
+
 ## What it does
 
 - Adds menu items to the Nickelite tab, the reading menu, and other supported Nickel menus. Items can run built-in actions, commands, or chained actions.
