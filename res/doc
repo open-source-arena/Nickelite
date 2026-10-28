@@ -289,9 +289,10 @@
 #
 # To use Nickelite to launch other software, you can usually use cmd_spawn with
 # the normal launch script. For example, KOReader and Plato will work as-is (or
-# with NiLuJe's one-click install packages which include NM). For specific
-# instructions, you should see their documentation (most newer software has
-# information about Nickelite). If using cmd_spawn directly doesn't work, you
+# with NiLuJe's one-click install packages which include NM). After KOReader
+# is installed under .adds/koreader, Settings > Shortcuts can add its standard
+# launch command. For specific instructions, see the software's documentation.
+# If cmd_spawn does not work, you
 # can also try using KFMon and the kfmon action/generator.
 #
 # - NiLuJe's KOReader/Plato packages: https://www.mobileread.com/forums/showthread.php?t=314220

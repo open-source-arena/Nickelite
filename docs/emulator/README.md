@@ -6,6 +6,19 @@ plugin loading and selected actions. This is a userspace approximation, not a
 booted Kobo board. See [action results](../action-compatibility-6.md) and
 [full-system feasibility](../emulator-board-feasibility.md).
 
+## Nickelite 1.1.0 KOReader shortcut check (2026-10-29)
+
+The 1.1.0 binary loaded on the 6.0.279225 guest. Shortcuts displayed the new
+KOReader switch; enabling it and applying wrote
+`menu_item:main:KOReader:cmd_spawn:quiet:exec /mnt/onboard/.adds/koreader/koreader.sh`
+to `.adds/nm/zz-nm-settings.conf`, and the menu item appeared immediately.
+The launcher script command ran under an explicit QEMU ARM interpreter. This
+userspace guest cannot test `QProcess::startDetached` because the container
+cannot directly execute its ARM `/bin/sh`; tapping the item displayed a process
+start error. KOReader itself was not installed or launched in this guest.
+The 1.1.0 ARM compatibility tests passed in the 5.18.270971 guest with its
+unsupported-firmware expectation, and in the 6.0.279225 guest.
+
 The image builder also pins official Clara BW **5.18.270971** and **6.0.279225**
 firmware. Set `NM_FIRMWARE_VERSION=5.18.270971` for the 5.x image. Its SHA-256
 checks are in [build-image.sh](build-image.sh); firmware stays outside Git.

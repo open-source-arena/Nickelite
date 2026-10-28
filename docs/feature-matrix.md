@@ -1,4 +1,4 @@
-# Upstream NickelMenu v0.6.0 compared with Nickelite 1.0.0 on Kobo 5+
+# Upstream NickelMenu v0.6.0 compared with Nickelite 1.1.0 on Kobo 5+
 
 This inventory uses the upstream [v0.6.0 documentation](https://github.com/pgaskin/NickelMenu/tree/v0.6.0), its tagged `Makefile` and source, plus this branch's action registry and the [physical compatibility report](firmware-6.0.279225.md). “Implemented” means the action exists and checks its runtime dependencies; it does not mean every subaction was tested on the N365. The physical results below apply to Clara BW (N365) on 6.0.279225.
 
@@ -31,6 +31,7 @@ for a full-rootfs replacement.
 | Action chains: success, failure, always, and `skip` | Implemented; disabled features fail normally so `chain_failure` can run. | Configure chains; `skip` stays available for recovery. |
 | Selection substitution and transforms | Implemented, including the corrected `u` and `x` flags. | Use selection menu entries. |
 | `cmd_spawn` and `cmd_output` | Implemented; command execution itself is not a Kobo 6 compatibility guarantee. | **Commands and output** switch; add config entries. |
+| KOReader launcher | Ready-made `cmd_spawn` shortcut uses KOReader's standard Kobo script. KOReader must be installed separately; actual launch has not been verified on a physical device. | Install KOReader under `.adds/koreader`, then turn on **KOReader** in Shortcuts. |
 | `dbg_syslog`, `dbg_error`, `dbg_msg`, `dbg_toast` | Implemented; always available for diagnostics and config errors. | Add config entries. |
 | `kfmon`, `kfmon_id`, and KFMon menu generator | Implemented; requires KFMon installed separately. | **KFMon launchers** switch; add action or generator entries. |
 | `_test` numbered menu generator | Implemented as a configuration test utility. | Add `generator:_test` with its location and count. |
@@ -52,7 +53,7 @@ for a full-rootfs replacement.
 
 The built-in **Nickelite Settings** view has **Shortcuts**, **Menu items**, and
 **Permissions** tabs. Shortcuts generate or remove ready-made menu items for
-dark mode, screenshots, rotation, Dropbox, Google Drive, Wi-Fi, Sleep, Restart,
+KOReader, dark mode, screenshots, rotation, Dropbox, Google Drive, Wi-Fi, Sleep, Restart,
 and Power off. Editing a generated item makes it a custom item; the shortcut
 switch no longer owns it. Permissions control the supported action groups
 above. All permissions default to on. Apply changes writes the hidden

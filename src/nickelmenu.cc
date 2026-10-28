@@ -100,6 +100,7 @@ struct nm_shortcut {
 };
 
 static constexpr nm_shortcut nm_shortcuts[] = {
+    {"KOReader", "cmd_spawn", "quiet:exec /mnt/onboard/.adds/koreader/koreader.sh", "commands"},
     {"Dark mode", "nickel_setting", "toggle:dark_mode", "dark_mode"},
     {"Screenshot", "nickel_screenshot", "capture", "screenshots"},
     {"Rotate screen", "nickel_orientation", "swap", "orientation"},

@@ -1,4 +1,4 @@
-# Nickelite 1.0.0
+# Nickelite 1.1.0
 
 Nickelite adds a configurable menu and a native Settings view to Kobo's Nickel reader software. It runs on the **Qt 6 based Kobo firmware 5+**. Firmware 4.x is outside this project's support scope.
 
@@ -12,7 +12,7 @@ Simulator screenshots (use Ctrl-click or Command-click to open one in a new tab)
 
 - Adds menu items to the Nickelite tab, the reading menu, and other supported Nickel menus. Items can run built-in actions, commands, or chained actions.
 - Lets you add, edit, duplicate, remove, reorder, and enable shortcuts in a native Settings view. Changes to `.adds/nm` config files appear in Settings; changes made in Settings are saved back to those files and refresh the menu immediately.
-- Provides shortcuts for screenshots, dark mode, orientation, Wi-Fi, power actions, Dropbox, and Google Drive. Permissions can disable individual action groups; blocked menu items remain visible but cannot run.
+- Provides shortcuts for KOReader, screenshots, dark mode, orientation, Wi-Fi, power actions, Dropbox, and Google Drive. Permissions can disable individual action groups; blocked menu items remain visible but cannot run.
 - Uses separate active and inactive tab icons.
 - Displays its version at the bottom of Settings. A firmware update may remove the plugin; reinstalling the package preserves the user config directory.
 
@@ -22,14 +22,14 @@ Kobo Clara BW (N365) does not normally show Dropbox or Google Drive in its More 
 
 | Firmware | Package | Evidence |
 | --- | --- | --- |
-| 5.18.270971 | `Nickelite-1.0.0-firmware-5.18.270971.zip` | Menu and Settings tested with a preceding editor candidate in QEMU; the 1.0.0 build loads its tab and passes ARM compatibility tests. Cloud access is not enabled for this firmware. |
-| 6.0.279225 | `Nickelite-1.0.0-firmware-6.0.279225.zip` | Menu and Settings tested in QEMU; cloud lists, downloads, and USB actions tested on a physical Clara BW (N365) with preceding candidates. |
+| 5.18.270971 | `Nickelite-1.1.0-firmware-5.18.270971.zip` | Menu and Settings tested with a preceding editor candidate in QEMU; the 1.1.0 build loads its tab and passes ARM compatibility tests. Cloud access is not enabled for this firmware. |
+| 6.0.279225 | `Nickelite-1.1.0-firmware-6.0.279225.zip` | Menu and Settings tested in QEMU, including the KOReader switch and generated menu entry; cloud lists, downloads, and USB actions tested on a physical Clara BW (N365) with preceding candidates. |
 
-These are the **pinned firmware builds** for the 1.0.0 downloads. Other firmware 5.x/6.x builds and Kobo models need separate compatibility checks. The only physical model tested so far is **Kobo Clara BW**. The simulator runs genuine Nickel in QEMU userspace; it does not emulate Kobo hardware. See the [compatibility matrix](docs/feature-matrix.md), [6.0 results](docs/firmware-6.0.279225.md), and [simulator guide](docs/emulator/real-cloud.md).
+These are the **pinned firmware builds** for the 1.1.0 downloads. Other firmware 5.x/6.x builds and Kobo models need separate compatibility checks. The only physical model tested so far is **Kobo Clara BW**. The simulator runs genuine Nickel in QEMU userspace; it does not emulate Kobo hardware. See the [compatibility matrix](docs/feature-matrix.md), [6.0 results](docs/firmware-6.0.279225.md), and [simulator guide](docs/emulator/real-cloud.md).
 
 ## Download and install
 
-Download the matching versioned ZIP and `SHA256SUMS` from the [public v1.0.0 release](https://github.com/open-source-arena/Nickelite/releases/tag/v1.0.0). Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
+Download the matching versioned ZIP and `SHA256SUMS` from the [public v1.1.0 release](https://github.com/open-source-arena/Nickelite/releases/tag/v1.1.0). Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
 
 **Automated install:** connect the Kobo by USB, tap **Connect**, and find its mounted storage path. Install [GitHub CLI](https://cli.github.com/) to download the release automatically; sign-in is not required for this public repository. Run one of these commands from a clone of this repository:
 
@@ -59,6 +59,8 @@ The installer preserves existing `.adds/nm` files. Cloud services also require a
 
 The **Shortcuts** tab controls ready-made menu entries. **Menu items** edits entries across target menus and groups them by target. **Permissions** controls whether actions are available. The editor writes new items to `.adds/nm/zz-nm-settings.conf`, while existing entries remain in their source files. It validates hand edits and asks before discarding unsaved changes. The interface uses page turns for long lists to suit e-ink latency.
 
+To add KOReader, [install KOReader for Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices) under `.adds/koreader`, then turn on **KOReader** in Nickelite Settings → Shortcuts and apply. The shortcut runs KOReader's standard `/mnt/onboard/.adds/koreader/koreader.sh` launcher. Nickelite does not bundle KOReader. If your KOReader installer already added the same menu entry, the switch reflects that entry; avoid adding a second one.
+
 For hand editing, add a separate text file under `.adds/nm`; do not edit `.adds/nm/doc`. See [the config reference](res/doc). The Settings view is available on both tested firmware versions. The USB connection action is available for custom items but is deliberately absent from ready-made shortcuts because it changes the device's storage connection state.
 
 ## Build and simulator
@@ -73,7 +75,7 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
 ./scripts/package-release.sh
 ```
 
-The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.0.0`. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
+The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.1.0`. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
 
 ## Origins and license
 
