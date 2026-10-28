@@ -1313,13 +1313,8 @@ typedef QMenu TouchMenu;
 typedef TouchMenu NickelTouchMenu;
 typedef int DecorationPosition;
 void (*NickelTouchMenu_NickelTouchMenu)(NickelTouchMenu*, QWidget* parent, DecorationPosition position);
-void (*NickelTouchMenu_showDecoration)(NickelTouchMenu*, bool);
-void (*NickelTouchMenu_setTargetRect)(NickelTouchMenu*, QRect const&);
-void (*NickelTouchMenu_setDecorationPosition)(NickelTouchMenu*, DecorationPosition);
-void (*NickelTouchMenu_setDecorationPositionOffset)(NickelTouchMenu*, QPoint const&);
 void (*MenuTextItem_MenuTextItem)(MenuTextItem*, QWidget* parent, bool checkable, bool italic);
 void (*MenuTextItem_setText)(MenuTextItem*, QString const& text);
-void (*MenuTextItem_setTextItalics)(MenuTextItem*, bool italic);
 void (*MenuTextItem_registerForTapGestures)(MenuTextItem*);
 
 // Selection menu stuff (14622+).
@@ -1476,13 +1471,8 @@ static struct nh_dlsym NickelMenuDlsym[] = {
     {.name = "_ZN13MainNavButton7setTextERK7QString",                .out = nh_symoutptr(MainNavButton_setText),               .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN13MainNavButton7setTextERK7QString
     {.name = "_ZN13MainNavButton6tappedEv",                          .out = nh_symoutptr(MainNavButton_tapped),                .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN13MainNavButton6tappedEv
     {.name = "_ZN15NickelTouchMenuC2EP7QWidget18DecorationPosition", .out = nh_symoutptr(NickelTouchMenu_NickelTouchMenu),     .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN15NickelTouchMenuC2EP7QWidget18DecorationPosition
-    {.name = "_ZN15NickelTouchMenu14showDecorationEb", .out = nh_symoutptr(NickelTouchMenu_showDecoration), .desc = "main menu popover caret", .optional = true},
-    {.name = "_ZN15NickelTouchMenu13setTargetRectERK5QRect", .out = nh_symoutptr(NickelTouchMenu_setTargetRect), .desc = "main menu popover caret", .optional = true},
-    {.name = "_ZN15NickelTouchMenu21setDecorationPositionE18DecorationPosition", .out = nh_symoutptr(NickelTouchMenu_setDecorationPosition), .desc = "main menu popover caret", .optional = true},
-    {.name = "_ZN15NickelTouchMenu27setDecorationPositionOffsetERK6QPoint", .out = nh_symoutptr(NickelTouchMenu_setDecorationPositionOffset), .desc = "main menu popover caret", .optional = true},
     {.name = "_ZN12MenuTextItemC1EP7QWidgetbb",                      .out = nh_symoutptr(MenuTextItem_MenuTextItem),           .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN12MenuTextItemC1EP7QWidgetbb
     {.name = "_ZN12MenuTextItem7setTextERK7QString",                 .out = nh_symoutptr(MenuTextItem_setText),                .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN12MenuTextItem7setTextERK7QString
-    {.name = "_ZN12MenuTextItem14setTextItalicsEb", .out = nh_symoutptr(MenuTextItem_setTextItalics), .desc = "main menu popover text style", .optional = true},
     {.name = "_ZN12MenuTextItem22registerForTapGesturesEv",          .out = nh_symoutptr(MenuTextItem_registerForTapGestures), .desc = "bottom nav main menu button injection (15505+)", .optional = true}, //libnickel 4.23.15505 * _ZN12MenuTextItem22registerForTapGesturesEv
 
     // selection menu injection (14622+)
@@ -1795,20 +1785,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
             return;
         }
 
-        auto option = [](const char *name, int fallback = 0) {
-            const char *value = nm_global_config_experimental(name);
-            if (!value) return fallback;
-            bool ok = false;
-            const int parsed = QString::fromLatin1(value).toInt(&ok);
-            return ok ? parsed : fallback;
-        };
-        const bool caret = option("menu_main_15505_caret") == 1
-            && NickelTouchMenu_showDecoration && NickelTouchMenu_setTargetRect;
-        const int decoration = option("menu_main_15505_decoration", 3);
-        const bool flushSeparators = option("menu_main_15505_flush_separators") == 1
-            && LightMenuSeparator_LightMenuSeparator;
-        const bool italic = option("menu_main_15505_italic", 1) != 0;
-        NickelTouchMenu_NickelTouchMenu(menu, caret ? btn->window() : nullptr, decoration);
+        NickelTouchMenu_NickelTouchMenu(menu, nullptr, 3);
 
         const size_t builtIn = NM_QT_MAJOR >= 6 ? 1 : 0;
         for (size_t i = 0; i < items_n + builtIn; i++) {
@@ -1831,10 +1808,8 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
                 return;
             }
 
-            MenuTextItem_MenuTextItem(mti, menu, false, italic);
+            MenuTextItem_MenuTextItem(mti, menu, false, true);
             MenuTextItem_setText(mti, QString::fromUtf8(label));
-            if (!italic && MenuTextItem_setTextItalics)
-                MenuTextItem_setTextItalics(mti, false);
             MenuTextItem_registerForTapGestures(mti); // this only makes the MenuTextItem::tapped signal connect so it highlights on tap, doesn't apply to the QAction::triggered below (which needs another GestureReceiver somewhere)
             bool enabled = true;
 #if NM_QT_MAJOR >= 6
@@ -1852,17 +1827,8 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
             QWidget::connect(ac, &QAction::triggered, menu, &QMenu::hide);
 
-            if (i != items_n + builtIn - 1) {
-                QAction *separator = nullptr;
-                if (flushSeparators) {
-                    separator = reinterpret_cast<QAction *>(nm_native_storage("LightMenuSeparator", 32));
-                    if (separator) {
-                        LightMenuSeparator_LightMenuSeparator(separator, menu);
-                        menu->addAction(separator);
-                    }
-                }
-                if (!separator) menu->addSeparator();
-            }
+            if (i != items_n + builtIn - 1)
+                menu->addSeparator();
 
             // shim so we don't need to deal with GestureReceiver directly like _ZN28AbstractNickelMenuController18createMenuTextItemEP5QMenuRK7QStringbbS4_ does
             // (similar to _ZN23SelectionMenuController11addMenuItemEP17SelectionMenuViewP12MenuTextItemPKc)
@@ -1894,30 +1860,8 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
         QWidget::connect(menu, &QMenu::aboutToHide, menu, &QWidget::deleteLater);
 
-        if (caret) {
-            NickelTouchMenu_showDecoration(menu, true);
-            if (NickelTouchMenu_setDecorationPosition)
-                NickelTouchMenu_setDecorationPosition(menu, decoration);
-            const QRect target(btn->mapToGlobal(QPoint(0, 0)), btn->size());
-            NickelTouchMenu_setTargetRect(menu, target);
-            if (NickelTouchMenu_setDecorationPositionOffset)
-                NickelTouchMenu_setDecorationPositionOffset(menu, target.topLeft()
-                    + QPoint(option("menu_main_15505_caret_dx"), option("menu_main_15505_caret_dy")));
-        }
-        const int width = option("menu_main_15505_width");
-        if (width > 0) menu->setFixedWidth(qMin(width, btn->window()->width()));
         menu->ensurePolished();
         menu->popup(btn->mapToGlobal(btn->geometry().topRight() - QPoint(0, menu->sizeHint().height())));
-        const QPoint offset(option("menu_main_15505_offset_x"), option("menu_main_15505_offset_y"));
-        if (!offset.isNull()) menu->move(menu->pos() + offset);
-        if (flushSeparators) {
-            const int inset = qBound(0, option("menu_main_15505_separator_inset"), menu->width() / 2);
-            for (QWidget *widget : menu->findChildren<QWidget *>()) {
-                if (!widget->inherits("LightMenuSeparator")) continue;
-                const QRect rect = widget->geometry();
-                widget->setGeometry(inset, rect.y(), menu->width() - 2 * inset, rect.height());
-            }
-        }
     });
 
     bl->addWidget(btn, 1);

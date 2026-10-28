@@ -234,15 +234,6 @@
 #                  label            - sets the label used for the Nickelite button on 4.23.15505+
 #                  icon             - sets the icon used for the Nickelite button on 4.23.15505+
 #                  icon_active      - sets the active icon used for the Nickelite button on 4.23.15505+
-#                  caret            - 1 requests a pointer toward the tab (default 0;
-#                                     not yet visible in the Qt 6 simulator)
-#                  decoration       - pointer edge: 0 top, 1 right, 2 left, 3 bottom (default 3)
-#                  caret_dx/dy      - pointer anchor offset in pixels
-#                  offset_x/y       - menu offset in pixels after screen fitting
-#                  width            - menu width in pixels (default automatic)
-#                  flush_separators - 1 uses full-width native row dividers (default 0)
-#                  separator_inset  - divider inset in pixels (default 0)
-#                  italic           - 0 makes labels upright (default 1)
 #
 #     <val>  the option value:
 #              (..)_enabled     -> 0 or 1

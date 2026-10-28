@@ -29,7 +29,14 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         version="${GITHUB_REF_NAME#v}"
-        gh release create "$GITHUB_REF_NAME" "dist/$version/"*.zip "dist/$version/SHA256SUMS" \
-          scripts/install.sh scripts/install.ps1 \
-          --repo "$GITHUB_REPOSITORY" --verify-tag --title "Nickelite $version" \
-          --notes-file "dist/$version/RELEASE.md"
+        if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          gh release upload "$GITHUB_REF_NAME" "dist/$version/"*.zip "dist/$version/SHA256SUMS" \
+            scripts/install.sh scripts/install.ps1 --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "Nickelite $version" --notes-file "dist/$version/RELEASE.md"
+        else
+          gh release create "$GITHUB_REF_NAME" "dist/$version/"*.zip "dist/$version/SHA256SUMS" \
+            scripts/install.sh scripts/install.ps1 \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "Nickelite $version" \
+            --notes-file "dist/$version/RELEASE.md"
+        fi

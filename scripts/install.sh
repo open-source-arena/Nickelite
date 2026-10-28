@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo=Sojaner/NickelMenuNg
+repo=Sojaner/Nickelite
 version=1.0.0
 mount=${1:?Usage: install.sh /path/to/KOBOeReader [versioned-package.zip]}
 [ -f "$mount/.kobo/version" ] || { echo 'Kobo storage is not mounted at that path.' >&2; exit 1; }
