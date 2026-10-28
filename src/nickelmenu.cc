@@ -1775,8 +1775,8 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
 
         const size_t builtIn = NM_QT_MAJOR >= 6 ? 1 : 0;
         for (size_t i = 0; i < items_n + builtIn; i++) {
-            const bool featureSettings = builtIn && i == 0;
-            nm_menu_item_t *it = featureSettings ? nullptr : items[i - builtIn];
+            const bool featureSettings = builtIn && i == items_n;
+            nm_menu_item_t *it = featureSettings ? nullptr : items[i];
             if (!featureSettings && it->loc != NM_MENU_LOCATION(main))
                 continue;
 
