@@ -141,6 +141,10 @@ On the 6.0.279225 guest, turning Dropbox's action permission off dimmed its
 existing menu entry. Tapping the dimmed entry left the menu open and did not
 run the action or show an error. Turning the permission back on restored the
 normal label when the menu reopened.
+The subsequent 6.0.279225 Settings build showed `Dropbox · NickelMenu tab *`
+immediately after its permission was switched off, with a legend below the
+list. The marker persisted after Apply and reopening Settings; the underlying
+`menu_item` line did not gain an asterisk.
 In an earlier build, the arrow scrollbar's native layout was adjusted to give the track more of the
 list height. A VNC drag reached Book rescan without paging, and the down and up
 arrows moved the list to its last items and back to the start. A fresh 5.18

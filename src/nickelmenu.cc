@@ -424,6 +424,36 @@ static QString nm_ui_item_text(const QStringList &fields) {
     return fields[3] + QStringLiteral("  ·  ") + nm_choice_label(fields[2]);
 }
 
+static bool nm_ui_action_blocked(const QString &name, const QString &argument, const QList<QCheckBox *> &boxes) {
+    const QByteArray bytes = argument.toUtf8();
+    const char *feature = nullptr;
+#define X(action, qt5, qt6) if (name == QLatin1String(#action)) feature = nm_feature_for_action(NM_ACTION(action), bytes.constData());
+    NM_ACTIONS
+#undef X
+    if (!feature) return false;
+    for (qsizetype i = 0; i < boxes.size(); ++i)
+        if (!std::strcmp(nm_features[i].key, feature)) return !boxes[i]->isChecked();
+    return false;
+}
+
+static bool nm_ui_item_blocked(const QStringList &fields, const QMap<QString, QByteArray> &snapshots,
+                               const QList<QCheckBox *> &boxes) {
+    if (fields.size() != 6) return false;
+    if (nm_ui_action_blocked(fields[4], fields[5], boxes)) return true;
+    if (fields[1] == QLatin1String("-1") || !snapshots.contains(fields[0])) return false;
+    const QStringList lines = QString::fromUtf8(snapshots.value(fields[0])).split('\n');
+    for (int line = fields[1].toInt() + 1; line < lines.size(); ++line) {
+        const QString chain = lines[line].trimmed();
+        if (!chain.startsWith(QLatin1String("chain_"))) break;
+        const int actionStart = chain.indexOf(':');
+        const int argumentStart = chain.indexOf(':', actionStart + 1);
+        if (actionStart < 0 || argumentStart < 0) continue;
+        if (nm_ui_action_blocked(chain.mid(actionStart + 1, argumentStart - actionStart - 1).trimmed(),
+                                 chain.mid(argumentStart + 1).trimmed(), boxes)) return true;
+    }
+    return false;
+}
+
 static QListWidgetItem *nm_managed_shortcut(QListWidget *list, const nm_shortcut &shortcut) {
     for (int i = 0; i < list->count(); ++i) {
         auto *item = list->item(i);
@@ -859,8 +889,26 @@ static void nm_show_feature_settings() {
     auto *menuPager = new NmPagedFrame(menuPage, menuPageNumber, 76);
     menuPager->setList(menuItems);
     menuLayout->addWidget(menuPager->widget(), 1);
+    auto *blockedLegend = new QLabel(QStringLiteral("* Disabled because a permission is off."), menuPage);
+    blockedLegend->setFont(uiFont);
+    menuLayout->addWidget(blockedLegend);
     auto snapshots = QMap<QString, QByteArray>{};
     const bool editable = nm_read_ui_items(menuItems, &snapshots);
+    auto refreshMarkers = [menuItems, boxes, snapshots] {
+        const QSignalBlocker block(menuItems->model());
+        for (int i = 0; i < menuItems->count(); ++i) {
+            auto *item = menuItems->item(i);
+            const QStringList fields = item->data(Qt::UserRole).toStringList();
+            const QString text = nm_ui_item_text(fields)
+                + (nm_ui_item_blocked(fields, snapshots, boxes) ? QStringLiteral(" *") : QString());
+            if (item->text() != text) item->setText(text);
+        }
+    };
+    for (QCheckBox *box : boxes)
+        QObject::connect(box, &QCheckBox::toggled, view, refreshMarkers);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view, refreshMarkers);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::dataChanged, view, refreshMarkers);
+    refreshMarkers();
     QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view,
         [menuPager, menuItems] { menuPager->reveal(menuItems->count() - 1); });
     auto *quickPage = new QWidget(tabs);

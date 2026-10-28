@@ -62,6 +62,9 @@ Items whose actions are blocked by a permission appear dimmed and cannot be
 activated in NickelMenu's menus. If any action in a chain is blocked, the whole
 item is disabled. Re-enabling the permission restores the item when the menu is
 next opened.
+The Menu items editor appends ` *` to blocked rows and shows the explanation
+below the list. This marker updates with unsaved permission switches and is
+never written to the config file.
 Long lists page in one step per swipe or scrollbar tap, regardless of Kobo model
 or screen size. The native scrollbar appears only when a list has multiple pages.
 The USB connection action is available in the custom item

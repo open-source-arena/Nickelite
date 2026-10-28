@@ -71,7 +71,9 @@ actions. Permissions allow or block action groups, including custom items; they
 default to on and are saved in `.adds/nm/.features.ini`. Deleting that hidden
 file restores defaults. A menu item with any blocked action, including a
 chained action, remains visible but appears dimmed and cannot be tapped. The
-**Menu items** tab reads the
+**Menu items** tab marks these entries with ` *` and explains the marker below
+the list. The marker follows permission switches before Apply and is not saved
+as part of the item label. The tab reads the
 existing `.adds/nm` files. You can add, edit, duplicate, remove or move a menu item there;
 changes made in a text editor appear when you reopen Settings. New items go
 to `zz-nm-settings.conf`. Editing or moving an item keeps its chained actions,
