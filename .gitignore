@@ -24,6 +24,10 @@ test.syms
 *.o
 /Kobo.tgz
 /dist/
+!/dist/
+/dist/*
+!/dist/firmware-6.0.279225/
+!/dist/firmware-6.0.279225/*
 /docs/evidence/
 /src/embedded_resources.h
 /src/icon_data.h

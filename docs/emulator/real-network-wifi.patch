@@ -9,10 +9,9 @@
  #include <QPushButton>
  #include <QRegularExpression>
  #include <QString>
-@@ -15,6 +17,10 @@
- #include <QWidgetAction>
- 
- #include <cstdlib>
+@@ -61,5 +63,9 @@
+ #include <functional>
+ #include <memory>
 +#include <cstdint>
 +#include <dlfcn.h>
 +#include <sys/mman.h>

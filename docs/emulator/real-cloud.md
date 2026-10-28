@@ -8,10 +8,10 @@ peer-verified TLS handshake with `www.kobo.com` succeeds. The Docker bridge has
 ordinary outbound networking. It does not simulate a booted Kobo board, power,
 USB hardware or the firmware updater.
 
-The cloud plugin on this branch is experimental. The `09f8dc6` source was
-verified on one physical N365 running 6.0.274403 after earlier builds panicked
-on repeat cloud entry. Firmware 6.0.279225 passed simulator cloud-list entry,
-repeat entry and provider switching; physical cloud behavior is still pending.
+The cloud route is restricted to reviewed N365 firmware binaries. On one
+physical N365 running 6.0.279225, linked Google Drive and Dropbox file lists,
+repeat entry, provider switching, and test EPUB downloads passed. Other models
+and firmware builds remain unverified.
 
 ## Prerequisites
 
@@ -24,12 +24,12 @@ directory **outside this Git checkout**: its `onboard` subdirectory holds the
 Kobo account and cloud tokens after sign-in. Never commit, copy or publish it.
 
 Clone the private `Sojaner/NickelMenuNg` repository using your normal GitHub
-access and check out `experiment/cloud-reentry-qt6`. All commands below run
+access and check out `main`. All commands below run
 from that checkout's root. Set your own work and noVNC paths; use a local,
 dedicated directory for each fresh guest:
 
 ```sh
-git switch experiment/cloud-reentry-qt6
+git switch main
 work="$HOME/nickelmenung-qemu-6"
 novnc="$HOME/noVNC"
 mkdir -p "$work"
@@ -48,7 +48,7 @@ docker run --rm --network none -v "$PWD/docs/emulator:/out" \
   nickelmenung-qt6-sdk-build sh /out/rebuild-vnc.sh
 ```
 
-Build the experimental plugin in a disposable copy of this branch. The patch
+Build the simulator plugin in a disposable copy of this branch. The patch
 is restricted to the recognized N365 firmware hashes and only activates when
 `NM_QEMU_WIFI_CONNECTED=1`. It is intentionally absent from production source:
 

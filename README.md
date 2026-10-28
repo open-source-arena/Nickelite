@@ -34,9 +34,9 @@ diagnostic action passed there; cloud access and screenshot capture have not
 been established on 5.x. See the [5.18 simulator report](docs/emulator/README.md#firmware-518-settings-check-2026-10-27).
 
 The repository contains source, the vendored NickelHook dependency, and local
-build instructions. It excludes generated `dist/` packages, firmware payloads
-and private test evidence. Rebuild before installing: the old local `dist/`
-package was a baseline, not the later physical cloud-test candidate.
+build instructions. The committed `dist/firmware-6.0.279225/` contains the
+reviewed N365 package and a separate cloud shortcut configuration. Other
+generated packages, firmware payloads and private test evidence are excluded.
 
 Use a Linux host with Docker, a POSIX shell and Git. The SDK build downloads
 Ubuntu packages and the checksum-verified Qt 6.5.2 source, applies the included
@@ -57,6 +57,12 @@ To install on either listed firmware, back up `.adds/nm`, remove any existing
 `.adds/nm/uninstall` marker, and copy the freshly built `Kobo.tgz` to the mounted
 reader's `.kobo/` directory. Safely eject and disconnect so the reader can apply
 it. Keep Qt5 and Qt6 packages separate.
+
+For the committed N365 6.0.279225 package, follow
+[its package instructions](dist/firmware-6.0.279225/README.md). The cloud
+shortcuts are a separate config file: plugin installation alone does not add
+them to an existing menu. Both cloud permissions must also be on in
+NickelMenu Settings.
 
 Your existing `.adds/nm` configuration is retained, and the documentation file is
 created there on first startup if missing. Create a separate text file such as
