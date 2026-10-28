@@ -507,7 +507,7 @@ static QListWidgetItem *nm_managed_shortcut(QListWidget *list, const nm_shortcut
     for (int i = 0; i < list->count(); ++i) {
         auto *item = list->item(i);
         const QStringList fields = item->data(Qt::UserRole).toStringList();
-        if (fields.size() == 6 && fields[0] == nm_ui_items_path && fields[2] == QLatin1String("main")
+        if (fields.size() == 6 && fields[2] == QLatin1String("main")
             && fields[3] == QLatin1String(shortcut.label) && fields[4] == QLatin1String(shortcut.action)
             && fields[5] == QLatin1String(shortcut.argument)) return item;
     }
