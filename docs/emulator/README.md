@@ -126,7 +126,18 @@ controls still need a physical touch check before installation on the N365.
 The same two-icon build booted on the 5.18 guest and rendered the inactive tab
 icon. That guest did not respond to pointer clicks, so its active state was not
 visually confirmed there. The 6.0.279225 guest displayed both states.
-The arrow scrollbar's native layout was adjusted to give the track more of the
+The next 6.0.279225 Settings build copied the stock Energy saving and privacy
+page's gray section headings, fixed heading above the list, page count and
+native thin scrollbar. A 30-item disposable menu fixture showed five full
+pages; a VNC swipe advanced one page, and gutter taps reached page five.
+Permissions advanced from page one to two without elastic movement. Duplicate
+prefilled the native editor, accepted an identical Dropbox label and action,
+and a Move down tap changed the order in the saved guest config. These touch
+gestures and controls still need a physical e-ink latency check.
+The final paginated build also booted on the 5.18 guest and showed the
+NickelMenu tab. Pointer input remained unresponsive there, so its Settings
+controls could not be exercised on that guest.
+In an earlier build, the arrow scrollbar's native layout was adjusted to give the track more of the
 list height. A VNC drag reached Book rescan without paging, and the down and up
 arrows moved the list to its last items and back to the start. A fresh 5.18
 guest booted and displayed the supplied icon, but pointer input stopped

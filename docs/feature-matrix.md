@@ -58,8 +58,9 @@ switch no longer owns it. Permissions control the supported action groups
 above. All permissions default to on. Apply changes writes the hidden
 `.adds/nm/.features.ini` file on onboard storage; Back or another bottom tab
 asks before discarding unsaved changes.
-Each list scrolls with a visible vertical scrollbar, regardless of Kobo model
-or screen size. The USB connection action is available in the custom item
+Long lists page in one step per swipe or scrollbar tap, regardless of Kobo model
+or screen size. The native scrollbar appears only when a list has multiple pages.
+The USB connection action is available in the custom item
 editor, but is not a ready-made shortcut because it changes the device's
 storage connection state.
 The earlier popup opened on the physical N365 running 6.0.279225, and checkbox
@@ -78,7 +79,9 @@ The **Menu items** tab reads the same `.adds/nm` files as NickelMenu. It shows
 hand-written `menu_item` entries and writes changes back to their source file;
 new entries go to `zz-nm-settings.conf`. It validates the entire config before
 and after saving and refuses to overwrite a file changed while the view was
-open. Editing a first action leaves its `chain_*` lines intact; removing the
+open. Duplicate prefills a new item and identical labels or actions are allowed.
+Move up/down changes the order within a source file and carries its adjacent
+`chain_*` lines with it. Editing a first action leaves its `chain_*` lines intact; removing the
 item removes those chained actions. The 5.18 simulator verified adding and
 running a new action, seeing a hand-edited label in both the menu and Settings,
 and removing a chained item without a parse error. These UI edits have not yet

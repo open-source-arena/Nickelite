@@ -70,17 +70,19 @@ dark mode, screenshots, rotation, cloud services, Wi-Fi, and separate power
 actions. Permissions allow or block action groups, including custom items; they
 default to on and are saved in `.adds/nm/.features.ini`. Deleting that hidden
 file restores defaults. The **Menu items** tab reads the
-existing `.adds/nm` files. You can add, edit or remove a menu item there;
+existing `.adds/nm` files. You can add, edit, duplicate, remove or move a menu item there;
 changes made in a text editor appear when you reopen Settings. New items go
-to `zz-nm-settings.conf`. Editing an item keeps its chained actions, while
-removing it removes the chain. **Apply changes** validates and writes the config,
+to `zz-nm-settings.conf`. Editing or moving an item keeps its chained actions,
+while removing it removes the chain. Move up/down works within the item's source
+config file. Duplicate prefills the editor and permits the same label and action.
+**Apply changes** validates and writes the config,
 then refreshes NickelMenu immediately; no reboot is needed. It rejects files
 changed while the Settings view was open. The view fills the page above Kobo's
 bottom navigation, shows readable menu and action names, and highlights the
 NickelMenu tab while open. Back or another bottom tab asks before discarding
 unsaved changes, including changes in the item editor. Its text fields use
-Kobo's on-screen keyboard. All three lists use Kobo's arrow scrollbar and touch
-flicking on smaller screens. Shortcuts and permissions use Kobo's toggle
+Kobo's on-screen keyboard. Long lists turn one page per swipe or scrollbar tap;
+the native thin scrollbar appears only when another page exists. Shortcuts and permissions use Kobo's toggle
 switches. The selected menu item is shown as white text across a black row.
 The NickelMenu tab uses separate [inactive](res/icon/NickelMenu-inactive.png)
 and [active](res/icon/NickelMenu-active.png) 42 × 42 transparent PNGs unless

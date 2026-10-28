@@ -32,23 +32,24 @@
 #include <QListWidget>
 #include <QMap>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPointer>
 #include <QSaveFile>
 #include <QScreen>
-#include <QScrollArea>
 #include <QScrollBar>
-#include <QScroller>
-#include <QScrollerProperties>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QSettings>
 #include <QTabWidget>
 #include <QTabBar>
 #include <QTimer>
+#include <QTouchEvent>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 #endif
 
 #include <cstdlib>
+#include <climits>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -204,43 +205,41 @@ static bool nm_write_ui_items(QListWidget *list, const QMap<QString, QByteArray>
         QFile current(it.key());
         if (!current.open(QIODevice::ReadOnly) || current.readAll() != it.value()) return false;
         QStringList lines = QString::fromUtf8(it.value()).split('\n');
-        bool dropChains = false;
-        bool dirty = false;
+        QMap<int, QStringList> blocks;
         for (int line = 0; line < lines.size(); ++line) {
-            const QStringList old = nm_menu_fields(lines[line]);
-            if (!old.isEmpty()) {
-                dropChains = false;
-                QListWidgetItem *matching = nullptr;
-                for (int n = 0; n < list->count(); ++n) {
-                    const QStringList fields = list->item(n)->data(Qt::UserRole).toStringList();
-                    if (fields[0] == it.key() && fields[1].toInt() == line) { matching = list->item(n); break; }
-                }
-                if (!matching) { lines[line].clear(); dropChains = true; dirty = true; }
-                else {
-                    const QStringList fields = matching->data(Qt::UserRole).toStringList();
-                    if (fields.mid(2) != old) {
-                        lines[line] = QLatin1String("menu_item:") + fields.mid(2).join(':');
-                        dirty = true;
-                    }
-                }
-            } else if (dropChains && lines[line].trimmed().startsWith(QLatin1String("chain_"))) {
-                lines[line].clear(); dirty = true;
-            } else if (!lines[line].trimmed().isEmpty() && !lines[line].trimmed().startsWith('#')) {
-                dropChains = false;
-            }
+            if (nm_menu_fields(lines[line]).isEmpty()) continue;
+            const int start = line;
+            QStringList block{lines[line]};
+            while (line + 1 < lines.size() && lines[line + 1].trimmed().startsWith(QLatin1String("chain_")))
+                block << lines[++line];
+            blocks.insert(start, block);
         }
-        if (dirty) changed.insert(it.key(), lines.join('\n').toUtf8());
+        QStringList ordered;
+        for (int n = 0; n < list->count(); ++n) {
+            const QStringList fields = list->item(n)->data(Qt::UserRole).toStringList();
+            if (fields[0] != it.key()) continue;
+            QStringList block = blocks.value(fields[1].toInt());
+            if (block.isEmpty()) block << QString();
+            block[0] = QLatin1String("menu_item:") + fields.mid(2).join(':');
+            ordered << block;
+        }
+        QStringList result;
+        int slot = 0;
+        for (int line = 0; line < lines.size(); ++line) {
+            if (!blocks.contains(line)) { result << lines[line]; continue; }
+            if (slot < ordered.size()) result << ordered[slot++];
+            line += blocks[line].size() - 1;
+        }
+        while (slot < ordered.size()) result << ordered[slot++];
+        if (result != lines) changed.insert(it.key(), result.join('\n').toUtf8());
     }
-    QByteArray added;
-    for (int n = 0; n < list->count(); ++n) {
-        const QStringList fields = list->item(n)->data(Qt::UserRole).toStringList();
-        if (fields[1] == QLatin1String("-1"))
-            added += (QLatin1String("menu_item:") + fields.mid(2).join(':') + QLatin1Char('\n')).toUtf8();
-    }
-    if (!added.isEmpty()) {
-        QByteArray base = changed.value(nm_ui_items_path, snapshots.value(nm_ui_items_path));
-        if (!base.isEmpty() && !base.endsWith('\n')) base += '\n';
-        changed.insert(nm_ui_items_path, base + added);
+    if (!snapshots.contains(nm_ui_items_path)) {
+        QStringList added;
+        for (int n = 0; n < list->count(); ++n) {
+            const QStringList fields = list->item(n)->data(Qt::UserRole).toStringList();
+            if (fields[0] == nm_ui_items_path) added << QLatin1String("menu_item:") + fields.mid(2).join(':');
+        }
+        if (!added.isEmpty()) changed.insert(nm_ui_items_path, (added.join('\n') + '\n').toUtf8());
     }
     for (auto it = changed.cbegin(); it != changed.cend(); ++it)
         if (QFile::exists(it.key()) && !snapshots.contains(it.key())) return false;
@@ -418,103 +417,142 @@ static QListWidgetItem *nm_managed_shortcut(QListWidget *list, const nm_shortcut
     return nullptr;
 }
 
-class NmSimulatorArrowFilter final : public QObject {
+class NmPagedFrame final : public QObject {
 public:
-    NmSimulatorArrowFilter(QScrollBar *source, bool down, QObject *parent)
-        : QObject(parent), source(source), down(down) {}
+    NmPagedFrame(QWidget *parent, QLabel *indicator, int rowHeight)
+        : QObject(parent), indicator(indicator), rowHeight(rowHeight) {
+        frame = new QFrame(parent);
+        frame->setObjectName(QStringLiteral("nmPagedFrame"));
+        auto *layout = new QHBoxLayout(frame);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(8);
+        auto ctor = reinterpret_cast<void (*)(QScrollBar *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN14TouchScrollBarC2EP7QWidget"));
+        auto setGutterTap = reinterpret_cast<void (*)(QScrollBar *, bool)>(dlsym(RTLD_DEFAULT, "_ZN14TouchScrollBar19setGutterTapEnabledEb"));
+        if (ctor && nh_native_type("TouchScrollBar").isValid()) {
+            bar = reinterpret_cast<QScrollBar *>(nm_native_storage("TouchScrollBar", 0));
+            if (bar) ctor(bar, frame);
+        }
+        if (!bar) bar = new QScrollBar(Qt::Vertical, frame);
+        bar->setOrientation(Qt::Vertical);
+        bar->setFixedWidth(24);
+        bar->setFocusPolicy(Qt::NoFocus);
+        if (setGutterTap && bar->inherits("TouchScrollBar")) setGutterTap(bar, false);
+        layout->addWidget(bar);
+        QObject::connect(bar, &QScrollBar::valueChanged, this, [this] { display(); });
+        frame->installEventFilter(this);
+        qApp->installEventFilter(this);
+    }
 
+    QWidget *widget() const { return frame; }
+    void setRows(const QList<QWidget *> &value) {
+        rows = value;
+        setContent(rows.isEmpty() ? nullptr : rows.first()->parentWidget());
+    }
+    void setList(QListWidget *value) {
+        list = value;
+        list->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        setContent(list);
+        QObject::connect(list->model(), &QAbstractItemModel::rowsInserted, this, [this] { refresh(); });
+        QObject::connect(list->model(), &QAbstractItemModel::rowsRemoved, this, [this] { refresh(); });
+    }
+    void refresh() {
+        const int count = list ? list->count() : rows.size();
+        perPage = qMax(1, (frame->height() - 8) / rowHeight);
+        const int pages = qMax(1, (count + perPage - 1) / perPage);
+        bar->setRange(0, pages - 1);
+        bar->setPageStep(1);
+        bar->setVisible(pages > 1);
+        indicator->setText(QStringLiteral("Page %1 of %2").arg(bar->value() + 1).arg(pages));
+        indicator->setVisible(pages > 1);
+        display();
+    }
+    void reveal(int row) {
+        refresh();
+        bar->setValue(row / perPage);
+    }
 protected:
-    bool eventFilter(QObject *, QEvent *event) override {
-        if (event->type() != QEvent::TouchEnd && event->type() != QEvent::MouseButtonRelease) return false;
-        const int step = qMax(1, source->pageStep() - 64);
-        source->setValue(source->value() + (down ? step : -step));
-        return true;
+    bool eventFilter(QObject *object, QEvent *event) override {
+        if (object == frame && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+            QTimer::singleShot(0, this, [this] { refresh(); });
+            return false;
+        }
+        auto *widget = qobject_cast<QWidget *>(object);
+        if (!content || !widget || (widget != content && !content->isAncestorOf(widget))) return false;
+        if (event->type() == QEvent::Wheel) {
+            bar->setValue(bar->value() + (static_cast<QWheelEvent *>(event)->angleDelta().y() < 0 ? 1 : -1));
+            return true;
+        }
+        int y = 0;
+        if (event->type() == QEvent::TouchBegin || event->type() == QEvent::TouchUpdate || event->type() == QEvent::TouchEnd) {
+            const auto points = static_cast<QTouchEvent *>(event)->points();
+            if (points.isEmpty()) return false;
+            y = qRound(points.first().globalPosition().y());
+        } else if (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseMove
+                   || event->type() == QEvent::MouseButtonRelease) {
+            y = qRound(static_cast<QMouseEvent *>(event)->globalPosition().y());
+        } else return false;
+        if (event->type() == QEvent::TouchBegin || event->type() == QEvent::MouseButtonPress) {
+            startY = y;
+            swiped = false;
+            return false;
+        }
+        if (swiped) {
+            if (event->type() == QEvent::TouchEnd || event->type() == QEvent::MouseButtonRelease) {
+                swiped = false;
+                startY = INT_MIN;
+            }
+            return true;
+        }
+        if (startY != INT_MIN && qAbs(y - startY) > 70) {
+            bar->setValue(bar->value() + (y < startY ? 1 : -1));
+            swiped = event->type() != QEvent::TouchEnd && event->type() != QEvent::MouseButtonRelease;
+            if (!swiped) startY = INT_MIN;
+            return true;
+        }
+        if (event->type() == QEvent::TouchEnd || event->type() == QEvent::MouseButtonRelease) startY = INT_MIN;
+        return false;
     }
-
 private:
-    QScrollBar *source;
-    bool down;
-};
-
-static QWidget *nm_scroll_page(QAbstractScrollArea *area, QWidget *parent) {
-    area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    auto *page = new QWidget(parent);
-    auto *layout = new QHBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(6);
-    area->setMinimumWidth(0);
-    area->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
-    layout->addWidget(area);
-    auto arrowCtor = reinterpret_cast<void (*)(QWidget *, QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN14ArrowScrollBarC2EP7QWidgetb"));
-    auto arrowBar = reinterpret_cast<QScrollBar *(*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN14ArrowScrollBar9scrollBarEv"));
-    QWidget *barWidget = nullptr;
+    void setContent(QWidget *value) {
+        content = value;
+        if (content) {
+            content->setParent(frame);
+            frame->layout()->removeWidget(bar);
+            static_cast<QHBoxLayout *>(frame->layout())->addWidget(content, 1);
+            static_cast<QHBoxLayout *>(frame->layout())->addWidget(bar);
+        }
+        refresh();
+    }
+    void display() {
+        const int first = bar->value() * perPage;
+        const int last = first + perPage;
+        if (list) {
+            if (list->currentRow() >= 0 && (list->currentRow() < first || list->currentRow() >= last))
+                list->setCurrentRow(-1);
+            for (int i = 0; i < list->count(); ++i) list->item(i)->setHidden(i < first || i >= last);
+        } else {
+            for (int i = 0; i < rows.size(); ++i) {
+                const bool onPage = i >= first && i < last;
+                rows[i]->setVisible(onPage);
+                if (onPage)
+                    for (QWidget *child : rows[i]->findChildren<QWidget *>())
+                        if (child->inherits("ToggleSwitch")) child->show();
+            }
+        }
+        indicator->setText(QStringLiteral("Page %1 of %2").arg(bar->value() + 1).arg(bar->maximum() + 1));
+    }
+    QWidget *frame = nullptr;
+    QWidget *content = nullptr;
+    QLabel *indicator = nullptr;
     QScrollBar *bar = nullptr;
-    if (arrowCtor && arrowBar && nh_native_type("ArrowScrollBar").isValid()) {
-        barWidget = reinterpret_cast<QWidget *>(nm_native_storage("ArrowScrollBar", 0));
-        if (barWidget) {
-            arrowCtor(barWidget, page, true);
-            bar = arrowBar(barWidget);
-        }
-    }
-    auto ctor = reinterpret_cast<void (*)(QScrollBar *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN14TouchScrollBarC2EP7QWidget"));
-    auto setGutterTap = reinterpret_cast<void (*)(QScrollBar *, bool)>(dlsym(RTLD_DEFAULT, "_ZN14TouchScrollBar19setGutterTapEnabledEb"));
-    if (!bar && ctor && nh_native_type("TouchScrollBar").isValid()) {
-        bar = reinterpret_cast<QScrollBar *>(nm_native_storage("TouchScrollBar", 0));
-        if (bar) {
-            ctor(bar, page);
-            barWidget = bar;
-        }
-    }
-    if (!bar) {
-        bar = new QScrollBar(Qt::Vertical, page);
-        barWidget = bar;
-    }
-    bar->setOrientation(Qt::Vertical);
-    if (barWidget != bar) {
-        // The stock arrow labels reserve tall touch targets. Keep the native
-        // controls while allowing the track to use the full Settings frame.
-        if (auto *nativeLayout = barWidget->layout()) {
-            auto margins = nativeLayout->contentsMargins();
-            margins.setBottom(0);
-            nativeLayout->setContentsMargins(margins);
-        }
-        int arrowIndex = 0;
-        for (auto *child : barWidget->findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly)) {
-            if (child == bar || !child->inherits("ScrollBarTouchLabel")) continue;
-            child->setFixedHeight(48);
-            if (QGuiApplication::platformName() == QLatin1String("vnc"))
-                child->installEventFilter(new NmSimulatorArrowFilter(area->verticalScrollBar(), arrowIndex != 0, child));
-            ++arrowIndex;
-        }
-    }
-    barWidget->setFixedWidth(barWidget == bar ? 24 : barWidget->minimumSizeHint().width());
-    barWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    bar->setFocusPolicy(Qt::NoFocus);
-    if (setGutterTap && bar->inherits("TouchScrollBar")) setGutterTap(bar, false);
-    layout->addWidget(barWidget);
-    auto *source = area->verticalScrollBar();
-    auto syncRange = [bar, barWidget, source](int min, int max) {
-        bar->setRange(min, max);
-        bar->setPageStep(source->pageStep());
-        barWidget->setVisible(max > min);
-    };
-    QObject::connect(source, &QScrollBar::rangeChanged, bar, syncRange);
-    QObject::connect(source, &QScrollBar::valueChanged, bar, &QScrollBar::setValue);
-    QObject::connect(bar, &QScrollBar::valueChanged, source, &QScrollBar::setValue);
-    syncRange(source->minimum(), source->maximum());
-    bar->setValue(source->value());
-    auto *scroller = QScroller::scroller(area->viewport());
-    auto properties = scroller->scrollerProperties();
-    properties.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QScrollerProperties::OvershootAlwaysOn);
-    scroller->setScrollerProperties(properties);
-    return page;
-}
-
-static void nm_grab_scroll_gesture(QAbstractScrollArea *area) {
-    // The VNC simulator supplies mouse events; Kobo hardware supplies touch.
-    QScroller::grabGesture(area->viewport(), QGuiApplication::platformName() == QLatin1String("vnc")
-        ? QScroller::LeftMouseButtonGesture : QScroller::TouchGesture);
-}
+    QListWidget *list = nullptr;
+    QList<QWidget *> rows;
+    int rowHeight;
+    int perPage = 1;
+    int startY = INT_MIN;
+    bool swiped = false;
+};
 
 struct nm_switch_row {
     QWidget *row;
@@ -638,8 +676,8 @@ static void nm_native_style_button(QPushButton *button) {
     button->setStyleSheet(QStringLiteral("QPushButton { background: #dedede; border: 0; padding: 10px 18px; } QPushButton:pressed { background: black; color: white; }"));
 }
 
-static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing) {
-    QWidget *editor = nm_native_view(existing ? QStringLiteral("Edit menu item") : QStringLiteral("Add menu item"), list->window());
+static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool duplicate = false) {
+    QWidget *editor = nm_native_view(existing && !duplicate ? QStringLiteral("Edit menu item") : QStringLiteral("Add menu item"), list->window());
     if (!editor) {
         nm_show_dialog(QStringLiteral("NickelMenu Settings"), QStringLiteral("Kobo's native editor is unavailable on this firmware."));
         return;
@@ -701,16 +739,16 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing) {
     nm_native_style_button(save);
     layout->addWidget(save);
     nm_native_set_content(editor, content);
-    QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, location, label, action, argument, guard] {
+    QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, duplicate, location, label, action, argument, guard] {
         if (label->text().trimmed().isEmpty() || label->text().contains(':') || label->text().contains('\n')
             || label->text().contains('\r') || argument->text().contains('\n') || argument->text().contains('\r')) {
             nm_show_dialog(QStringLiteral("Menu item"), QStringLiteral("Enter a label without colons or line breaks, and a one-line argument."));
             return;
         }
-        const QStringList previous = existing ? existing->data(Qt::UserRole).toStringList()
+        const QStringList previous = existing && !duplicate ? existing->data(Qt::UserRole).toStringList()
                                               : QStringList{nm_ui_items_path, QStringLiteral("-1")};
         const QStringList fields{previous[0], previous[1], location.currentText(), label->text().trimmed(), action.currentText(), argument->text()};
-        auto *item = existing ? existing : new QListWidgetItem(list);
+        auto *item = existing && !duplicate ? existing : new QListWidgetItem(list);
         item->setData(Qt::UserRole, fields);
         item->setText(nm_ui_item_text(fields));
         guard->allow();
@@ -735,25 +773,38 @@ static void nm_show_feature_settings() {
     content->setFont(uiFont);
     auto *layout = new QVBoxLayout(content);
     layout->setContentsMargins(22, 8, 22, 18);
-    layout->setSpacing(14);
+    layout->setSpacing(24);
     auto *tabs = new QTabWidget(content);
     tabs->tabBar()->setFocusPolicy(Qt::NoFocus);
     tabs->setStyleSheet(QStringLiteral(
         "QTabWidget::pane { border: 0; border-top: 1px solid #aaa; }"
         "QTabBar::tab { border: 0; background: white; min-height: 58px; min-width: 150px; padding: 4px 8px; font-size: 25px; }"
         "QTabBar::tab:selected { border-bottom: 4px solid black; font-weight: bold; }"
-        "QListWidget { border: 0; font-size: 30px; } QListWidget::item { min-height: 64px; }"
+          "QLabel#nmSectionHeading { background: #dedede; padding: 7px 12px; font-size: 23px; }"
+          "QFrame#nmPagedFrame { border: 0; }"
+          "QListWidget { border: 0; font-size: 30px; } QListWidget::item { min-height: 76px; border-bottom: 1px solid #aaa; }"
         "QListWidget::item:selected { background: black; color: white; border: 0; }"));
     layout->addWidget(tabs);
-    auto *scroll = new QScrollArea(tabs);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setWidgetResizable(true);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    nm_grab_scroll_gesture(scroll);
-    auto *featureList = new QWidget(scroll);
+    auto *permissionsPage = new QWidget(tabs);
+    auto *permissionsLayout = new QVBoxLayout(permissionsPage);
+    permissionsLayout->setContentsMargins(0, 0, 0, 0);
+    auto *permissionsHeading = new QLabel(QStringLiteral("ACTION PERMISSIONS"), permissionsPage);
+    permissionsHeading->setObjectName(QStringLiteral("nmSectionHeading"));
+    permissionsLayout->addWidget(permissionsHeading);
+    auto *permissionsHint = new QLabel(QStringLiteral("Allow actions in menu items."), permissionsPage);
+    permissionsHint->setFont(uiFont);
+    permissionsLayout->addWidget(permissionsHint);
+    auto *permissionsPageNumber = new QLabel(permissionsPage);
+    permissionsPageNumber->setFont(uiFont);
+    permissionsLayout->addWidget(permissionsPageNumber, 0, Qt::AlignRight);
+    auto *permissionsPager = new NmPagedFrame(permissionsPage, permissionsPageNumber, 78);
+    permissionsLayout->addWidget(permissionsPager->widget(), 1);
+    auto *featureList = new QWidget(permissionsPage);
     auto *rows = new QVBoxLayout(featureList);
-    rows->setSpacing(8);
+    rows->setContentsMargins(0, 0, 0, 0);
+    rows->setSpacing(0);
     QList<QCheckBox *> boxes;
+    QList<QWidget *> permissionRows;
     for (const auto &feature : nm_features) {
         const auto switchRow = nm_native_switch(featureList, QLatin1String(feature.label));
         auto *box = switchRow.state;
@@ -764,43 +815,56 @@ static void nm_show_feature_settings() {
         font.setPixelSize(26);
         switchRow.row->setFont(font);
         rows->addWidget(switchRow.row);
+        permissionRows << switchRow.row;
         boxes.append(box);
     }
     rows->addStretch();
-    scroll->setWidget(featureList);
-    tabs->addTab(nm_scroll_page(scroll, tabs), QStringLiteral("Permissions"));
+    permissionsPager->setRows(permissionRows);
+    tabs->addTab(permissionsPage, QStringLiteral("Permissions"));
     auto *menuPage = new QWidget(tabs);
     auto *menuLayout = new QVBoxLayout(menuPage);
-    menuLayout->setContentsMargins(0, 0, 0, 0);
-    auto *hint = new QLabel(QStringLiteral("Choose an item to edit or remove. Tap Apply changes to update your menus and .adds/nm files."), menuPage);
-    hint->setWordWrap(true);
+    menuLayout->setContentsMargins(0, 0, 0, 20);
+    auto *menuHeading = new QLabel(QStringLiteral("MENU ITEMS"), menuPage);
+    menuHeading->setObjectName(QStringLiteral("nmSectionHeading"));
+    menuLayout->addWidget(menuHeading);
+    auto *hint = new QLabel(QStringLiteral("Select an item. Move within its config file."), menuPage);
     hint->setFont(uiFont);
     menuLayout->addWidget(hint);
+    auto *menuPageNumber = new QLabel(menuPage);
+    menuPageNumber->setFont(uiFont);
+    menuLayout->addWidget(menuPageNumber, 0, Qt::AlignRight);
     auto *menuItems = new QListWidget(menuPage);
     menuItems->setFocusPolicy(Qt::NoFocus);
     menuItems->setFont(uiFont);
-    menuItems->setSpacing(8);
-    menuItems->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    nm_grab_scroll_gesture(menuItems);
-    menuLayout->addWidget(nm_scroll_page(menuItems, menuPage));
+    menuItems->setSpacing(0);
+    menuItems->setFrameShape(QFrame::NoFrame);
+    auto *menuPager = new NmPagedFrame(menuPage, menuPageNumber, 76);
+    menuPager->setList(menuItems);
+    menuLayout->addWidget(menuPager->widget(), 1);
     auto snapshots = QMap<QString, QByteArray>{};
     const bool editable = nm_read_ui_items(menuItems, &snapshots);
-    auto *quickScroll = new QScrollArea(tabs);
-    quickScroll->setFrameShape(QFrame::NoFrame);
-    quickScroll->setWidgetResizable(true);
-    quickScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    nm_grab_scroll_gesture(quickScroll);
-    auto *quickList = new QWidget(quickScroll);
-    auto *quickRows = new QVBoxLayout(quickList);
-    quickRows->setSpacing(8);
-    auto *quickTitle = new QLabel(QStringLiteral("Show in NickelMenu"), quickList);
-    quickTitle->setFont(uiFont);
-    quickRows->addWidget(quickTitle);
-    auto *quickHint = new QLabel(QStringLiteral("These switches add or remove ready-made menu items. Custom entries stay in Menu items."), quickList);
-    quickHint->setWordWrap(true);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view,
+        [menuPager, menuItems] { menuPager->reveal(menuItems->count() - 1); });
+    auto *quickPage = new QWidget(tabs);
+    auto *quickLayout = new QVBoxLayout(quickPage);
+    quickLayout->setContentsMargins(0, 0, 0, 0);
+    auto *quickHeading = new QLabel(QStringLiteral("SHOW IN NICKELMENU"), quickPage);
+    quickHeading->setObjectName(QStringLiteral("nmSectionHeading"));
+    quickLayout->addWidget(quickHeading);
+    auto *quickHint = new QLabel(QStringLiteral("Add or remove ready-made menu items."), quickPage);
     quickHint->setFont(uiFont);
-    quickRows->addWidget(quickHint);
+    quickLayout->addWidget(quickHint);
+    auto *quickPageNumber = new QLabel(quickPage);
+    quickPageNumber->setFont(uiFont);
+    quickLayout->addWidget(quickPageNumber, 0, Qt::AlignRight);
+    auto *quickPager = new NmPagedFrame(quickPage, quickPageNumber, 78);
+    quickLayout->addWidget(quickPager->widget(), 1);
+    auto *quickList = new QWidget(quickPage);
+    auto *quickRows = new QVBoxLayout(quickList);
+    quickRows->setContentsMargins(0, 0, 0, 0);
+    quickRows->setSpacing(0);
     QList<QCheckBox *> quickBoxes;
+    QList<QWidget *> shortcutRows;
     for (const auto &shortcut : nm_shortcuts) {
         const auto switchRow = nm_native_switch(quickList, QLatin1String(shortcut.label));
         auto *box = switchRow.state;
@@ -810,6 +874,7 @@ static void nm_show_feature_settings() {
         switchRow.row->setMinimumHeight(70);
         switchRow.row->setFont(uiFont);
         quickRows->addWidget(switchRow.row);
+        shortcutRows << switchRow.row;
         quickBoxes << box;
         QObject::connect(box, &QCheckBox::toggled, view, [menuItems, boxes, shortcut](bool checked) {
             if (checked && !nm_managed_shortcut(menuItems, shortcut)) {
@@ -821,20 +886,14 @@ static void nm_show_feature_settings() {
                 item->setData(Qt::UserRole, fields);
                 menuItems->addItem(item);
             } else if (!checked) {
-                if (auto *item = nm_managed_shortcut(menuItems, shortcut)) delete menuItems->takeItem(menuItems->row(item));
+                while (auto *item = nm_managed_shortcut(menuItems, shortcut))
+                    delete menuItems->takeItem(menuItems->row(item));
             }
         });
     }
     quickRows->addStretch();
-    quickScroll->setWidget(quickList);
-    tabs->insertTab(0, nm_scroll_page(quickScroll, tabs), QStringLiteral("Shortcuts"));
-    auto *permissionsTitle = new QLabel(QStringLiteral("Action permissions"), featureList);
-    permissionsTitle->setFont(uiFont);
-    rows->insertWidget(0, permissionsTitle);
-    auto *permissionsHint = new QLabel(QStringLiteral("These allow or block actions, including custom menu items. They do not add menu items."), featureList);
-    permissionsHint->setWordWrap(true);
-    permissionsHint->setFont(uiFont);
-    rows->insertWidget(1, permissionsHint);
+    quickPager->setRows(shortcutRows);
+    tabs->insertTab(0, quickPage, QStringLiteral("Shortcuts"));
     auto refreshQuick = [menuItems, quickBoxes] {
         for (qsizetype i = 0; i < quickBoxes.size(); ++i) {
             const QSignalBlocker block(quickBoxes[i]);
@@ -847,23 +906,40 @@ static void nm_show_feature_settings() {
     auto *menuButtons = new QVBoxLayout;
     auto *add = new QPushButton(QStringLiteral("Add menu item"), menuPage);
     auto *edit = new QPushButton(QStringLiteral("Edit selected"), menuPage);
+    auto *duplicate = new QPushButton(QStringLiteral("Duplicate selected"), menuPage);
     auto *remove = new QPushButton(QStringLiteral("Remove selected"), menuPage);
-    for (auto *button : {add, edit, remove}) {
+    auto *moveUp = new QPushButton(QStringLiteral("Move up"), menuPage);
+    auto *moveDown = new QPushButton(QStringLiteral("Move down"), menuPage);
+    for (auto *button : {add, edit, duplicate, remove, moveUp, moveDown}) {
         nm_native_style_button(button);
         button->setEnabled(editable);
     }
     edit->setEnabled(false);
+    duplicate->setEnabled(false);
     remove->setEnabled(false);
+    moveUp->setEnabled(false);
+    moveDown->setEnabled(false);
     menuButtons->addWidget(add);
     auto *selectedButtons = new QHBoxLayout;
     selectedButtons->addWidget(edit);
+    selectedButtons->addWidget(duplicate);
     selectedButtons->addWidget(remove);
     menuButtons->addLayout(selectedButtons);
+    auto *moveButtons = new QHBoxLayout;
+    moveButtons->addWidget(moveUp);
+    moveButtons->addWidget(moveDown);
+    menuButtons->addLayout(moveButtons);
     menuLayout->addLayout(menuButtons);
     QObject::connect(menuItems, &QListWidget::currentItemChanged, view,
-        [edit, remove, editable](QListWidgetItem *item) {
+        [menuItems, edit, duplicate, remove, moveUp, moveDown, editable](QListWidgetItem *item) {
             edit->setEnabled(editable && item);
+            duplicate->setEnabled(editable && item);
             remove->setEnabled(editable && item);
+            const int row = item ? menuItems->row(item) : -1;
+            const QString source = item ? item->data(Qt::UserRole).toStringList().value(0) : QString();
+            moveUp->setEnabled(editable && row > 0 && menuItems->item(row - 1)->data(Qt::UserRole).toStringList().value(0) == source);
+            moveDown->setEnabled(editable && row >= 0 && row + 1 < menuItems->count()
+                && menuItems->item(row + 1)->data(Qt::UserRole).toStringList().value(0) == source);
         });
     tabs->insertTab(1, menuPage, QStringLiteral("Menu items"));
     tabs->setCurrentIndex(0);
@@ -871,9 +947,26 @@ static void nm_show_feature_settings() {
     QObject::connect(edit, &QPushButton::clicked, view, [menuItems] {
         if (auto *item = menuItems->currentItem()) nm_edit_ui_item(menuItems, item);
     });
+    QObject::connect(duplicate, &QPushButton::clicked, view, [menuItems] {
+        if (auto *item = menuItems->currentItem()) nm_edit_ui_item(menuItems, item, true);
+    });
     QObject::connect(remove, &QPushButton::clicked, view, [menuItems] {
         delete menuItems->takeItem(menuItems->currentRow());
     });
+    auto moveItem = [menuItems, menuPager](int delta) {
+        const int row = menuItems->currentRow();
+        const int target = row + delta;
+        if (row < 0 || target < 0 || target >= menuItems->count()) return;
+        if (menuItems->item(row)->data(Qt::UserRole).toStringList().value(0)
+            != menuItems->item(target)->data(Qt::UserRole).toStringList().value(0)) return;
+        const QSignalBlocker block(menuItems->model());
+        auto *item = menuItems->takeItem(row);
+        menuItems->insertItem(target, item);
+        menuPager->reveal(target);
+        menuItems->setCurrentItem(item);
+    };
+    QObject::connect(moveUp, &QPushButton::clicked, view, [moveItem] { moveItem(-1); });
+    QObject::connect(moveDown, &QPushButton::clicked, view, [moveItem] { moveItem(1); });
     if (!editable) nm_show_dialog(QStringLiteral("Menu items"), QStringLiteral("A config file could not be read or validated. Menu items are protected from changes."));
     QList<bool> initialFeatures;
     for (QCheckBox *box : boxes) initialFeatures << box->isChecked();
