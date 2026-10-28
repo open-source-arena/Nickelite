@@ -26,6 +26,7 @@ test.syms
 /dist/
 /docs/evidence/
 /src/embedded_resources.h
+/src/icon_data.h
 /test/qt_compat
 /test/qt_compat.d
 /test/compat

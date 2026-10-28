@@ -105,12 +105,28 @@ native selectors, with the original keys retained in config files.
 The three-tab Settings build was then run on both the 5.18.270971 and
 6.0.279225 guests. Shortcuts added Screenshot and Rotate screen to the Menu
 items list; Apply made them appear in NickelMenu without restarting Nickel.
-The final scrolling build shows an external, draggable vertical scrollbar on
+An earlier scrolling build showed an external, draggable vertical scrollbar on
 each list. On 5.18, a 30-item `reader` fixture in a temporary simulator config
 was scrolled to its final item. On both guests, the Permissions scrollbar
 reached Book rescan. In 6.0, a diagnostic dialog opened while Settings was
 visible; Settings yielded to the dialog and returned after OK. A physical USB
 prompt and touch flick still require hardware verification.
+
+On 2026-10-28, the 6.0.279225 simulator was updated to use the firmware's
+`ArrowScrollBar` (including its native `TouchScrollBar`) and `ToggleSwitch`
+controls in NickelMenu Settings. A VNC
+mouse drag scrolled Permissions by pixels; the selected Menu items row reversed
+the whole row to white on black. The NickelMenu tab first showed four bars;
+the supplied 42 × 42 PNG then replaced that icon as the default. Because
+the VNC platform has a fixed portrait framebuffer, Rotate screen now reports
+that rotation is unavailable there and leaves the view uncropped. The revised
+controls still need a physical touch check before installation on the N365.
+The arrow scrollbar's native layout was adjusted to give the track more of the
+list height. A VNC drag reached Book rescan without paging, and the down and up
+arrows moved the list to its last items and back to the start. A fresh 5.18
+guest booted and displayed the supplied icon, but pointer input stopped
+responding even after the plugin was temporarily removed; this prevents a
+reliable interaction check of this final build on that guest.
 
 The 5.18.270971 Kobo firmware image booted with the same Qt 6 `Kobo.tgz`
 build. On a fresh, sideloaded-mode onboard directory, the NickelMenu tab and

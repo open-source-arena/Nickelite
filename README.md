@@ -79,12 +79,20 @@ changed while the Settings view was open. The view fills the page above Kobo's
 bottom navigation, shows readable menu and action names, and highlights the
 NickelMenu tab while open. Back or another bottom tab asks before discarding
 unsaved changes, including changes in the item editor. Its text fields use
-Kobo's on-screen keyboard. All three lists scroll on smaller screens and show
-a vertical scrollbar. System dialogs can appear above Settings. The USB
+Kobo's on-screen keyboard. All three lists use Kobo's arrow scrollbar and touch
+flicking on smaller screens. Shortcuts and permissions use Kobo's toggle
+switches. The selected menu item is shown as white text across a black row.
+The NickelMenu tab uses the included [42 × 42 transparent PNG](res/icon/NickelMenu.png)
+unless a custom icon is configured.
+System dialogs can appear above Settings. The USB
 connection action remains available as a custom menu item; it is not a
 ready-made shortcut because it changes Kobo's storage connection state. Back up `.adds/nm` before
 substantial edits. See the
 [v0.6.0 feature matrix](docs/feature-matrix.md) for coverage and limits.
+
+The QEMU VNC simulator has a fixed portrait framebuffer. Its Rotate screen
+action shows an explanatory message instead of cropping the display; rotation
+on a physical Kobo still needs a separate check.
 
 Extras, Bluetooth controls, Pocket and reading awards are unavailable in this
 port. Actions check their required firmware symbols, native Qt allocation

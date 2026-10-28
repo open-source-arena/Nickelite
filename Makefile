@@ -37,7 +37,11 @@ override CPPFLAGS += -DNM_CONFIG_DIR='"$(NM_CONFIG_DIR)"' -DNM_CONFIG_DIR_DISP='
 include $(patsubst %/,%,$(NICKELHOOK))/NickelHook.mk
 
 override GENERATED += test/qt_compat test/qt_compat.d
-test/qt_compat: test/qt_compat.cc src/nickelmenu.cc $(filter-out src/nickelmenu.o src/install.o $(NICKELHOOK)nh.o $(NICKELHOOK)resources.o,$(OBJECTS_C) $(OBJECTS_CXX))
+override GENERATED += src/icon_data.h
+src/nickelmenu.o: src/icon_data.h
+src/icon_data.h: res/icon/NickelMenu.png $(patsubst %/,%,$(NICKELHOOK))/embed_resources.py
+	python3 $(patsubst %/,%,$(NICKELHOOK))/embed_resources.py $@ res/icon/NickelMenu.png
+test/qt_compat: test/qt_compat.cc src/nickelmenu.cc src/icon_data.h $(filter-out src/nickelmenu.o src/install.o $(NICKELHOOK)nh.o $(NICKELHOOK)resources.o,$(OBJECTS_C) $(OBJECTS_CXX))
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC $< $(filter %.o,$^) $(LDFLAGS) -o $@
 
 ifeq ($(NH_QT_MAJOR),6)

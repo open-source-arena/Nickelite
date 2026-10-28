@@ -38,9 +38,9 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QScroller>
+#include <QScrollerProperties>
 #include <QSet>
 #include <QSignalBlocker>
-#include <QStyleFactory>
 #include <QSettings>
 #include <QTabWidget>
 #include <QTabBar>
@@ -55,6 +55,7 @@
 
 #include <NickelHook.h>
 #include "native.h"
+#include "icon_data.h"
 
 #include "action.h"
 #include "config.h"
@@ -417,43 +418,146 @@ static QListWidgetItem *nm_managed_shortcut(QListWidget *list, const nm_shortcut
     return nullptr;
 }
 
+class NmSimulatorArrowFilter final : public QObject {
+public:
+    NmSimulatorArrowFilter(QScrollBar *source, bool down, QObject *parent)
+        : QObject(parent), source(source), down(down) {}
+
+protected:
+    bool eventFilter(QObject *, QEvent *event) override {
+        if (event->type() != QEvent::TouchEnd && event->type() != QEvent::MouseButtonRelease) return false;
+        const int step = qMax(1, source->pageStep() - 64);
+        source->setValue(source->value() + (down ? step : -step));
+        return true;
+    }
+
+private:
+    QScrollBar *source;
+    bool down;
+};
+
 static QWidget *nm_scroll_page(QAbstractScrollArea *area, QWidget *parent) {
     area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto *page = new QWidget(parent);
     auto *layout = new QHBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(4);
+    layout->setSpacing(6);
+    area->setMinimumWidth(0);
+    area->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
     layout->addWidget(area);
-    auto *bar = new QScrollBar(Qt::Vertical, page);
-    bar->setFixedWidth(42);
+    auto arrowCtor = reinterpret_cast<void (*)(QWidget *, QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN14ArrowScrollBarC2EP7QWidgetb"));
+    auto arrowBar = reinterpret_cast<QScrollBar *(*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN14ArrowScrollBar9scrollBarEv"));
+    QWidget *barWidget = nullptr;
+    QScrollBar *bar = nullptr;
+    if (arrowCtor && arrowBar && nh_native_type("ArrowScrollBar").isValid()) {
+        barWidget = reinterpret_cast<QWidget *>(nm_native_storage("ArrowScrollBar", 0));
+        if (barWidget) {
+            arrowCtor(barWidget, page, true);
+            bar = arrowBar(barWidget);
+        }
+    }
+    auto ctor = reinterpret_cast<void (*)(QScrollBar *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN14TouchScrollBarC2EP7QWidget"));
+    auto setGutterTap = reinterpret_cast<void (*)(QScrollBar *, bool)>(dlsym(RTLD_DEFAULT, "_ZN14TouchScrollBar19setGutterTapEnabledEb"));
+    if (!bar && ctor && nh_native_type("TouchScrollBar").isValid()) {
+        bar = reinterpret_cast<QScrollBar *>(nm_native_storage("TouchScrollBar", 0));
+        if (bar) {
+            ctor(bar, page);
+            barWidget = bar;
+        }
+    }
+    if (!bar) {
+        bar = new QScrollBar(Qt::Vertical, page);
+        barWidget = bar;
+    }
+    bar->setOrientation(Qt::Vertical);
+    if (barWidget != bar) {
+        // The stock arrow labels reserve tall touch targets. Keep the native
+        // controls while allowing the track to use the full Settings frame.
+        if (auto *nativeLayout = barWidget->layout()) {
+            auto margins = nativeLayout->contentsMargins();
+            margins.setBottom(0);
+            nativeLayout->setContentsMargins(margins);
+        }
+        int arrowIndex = 0;
+        for (auto *child : barWidget->findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly)) {
+            if (child == bar || !child->inherits("ScrollBarTouchLabel")) continue;
+            child->setFixedHeight(48);
+            if (QGuiApplication::platformName() == QLatin1String("vnc"))
+                child->installEventFilter(new NmSimulatorArrowFilter(area->verticalScrollBar(), arrowIndex != 0, child));
+            ++arrowIndex;
+        }
+    }
+    barWidget->setFixedWidth(barWidget == bar ? 24 : barWidget->minimumSizeHint().width());
+    barWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     bar->setFocusPolicy(Qt::NoFocus);
-    bar->setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
-    bar->setStyleSheet(QStringLiteral(
-        "QScrollBar:vertical { background: #ddd; width: 42px; margin: 0; }"
-        "QScrollBar::handle:vertical { background: #555; min-height: 80px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"));
-    layout->addWidget(bar);
+    if (setGutterTap && bar->inherits("TouchScrollBar")) setGutterTap(bar, false);
+    layout->addWidget(barWidget);
     auto *source = area->verticalScrollBar();
-    QObject::connect(source, &QScrollBar::rangeChanged, bar, [bar, source](int min, int max) {
+    auto syncRange = [bar, barWidget, source](int min, int max) {
         bar->setRange(min, max);
         bar->setPageStep(source->pageStep());
-    });
+        barWidget->setVisible(max > min);
+    };
+    QObject::connect(source, &QScrollBar::rangeChanged, bar, syncRange);
     QObject::connect(source, &QScrollBar::valueChanged, bar, &QScrollBar::setValue);
     QObject::connect(bar, &QScrollBar::valueChanged, source, &QScrollBar::setValue);
-    bar->setRange(source->minimum(), source->maximum());
-    bar->setPageStep(source->pageStep());
+    syncRange(source->minimum(), source->maximum());
     bar->setValue(source->value());
+    auto *scroller = QScroller::scroller(area->viewport());
+    auto properties = scroller->scrollerProperties();
+    properties.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QScrollerProperties::OvershootAlwaysOn);
+    scroller->setScrollerProperties(properties);
     return page;
 }
 
-static QCheckBox *nm_native_checkbox(QWidget *parent, const QString &text) {
-    auto ctor = reinterpret_cast<void (*)(QCheckBox *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN13TouchCheckBoxC2EP7QWidget"));
-    if (!ctor || !nh_native_type("TouchCheckBox").isValid()) return new QCheckBox(text, parent);
-    auto *box = reinterpret_cast<QCheckBox *>(nm_native_storage("TouchCheckBox", 0));
-    if (!box) return new QCheckBox(text, parent);
-    ctor(box, parent);
-    box->setText(text);
-    return box;
+static void nm_grab_scroll_gesture(QAbstractScrollArea *area) {
+    // The VNC simulator supplies mouse events; Kobo hardware supplies touch.
+    QScroller::grabGesture(area->viewport(), QGuiApplication::platformName() == QLatin1String("vnc")
+        ? QScroller::LeftMouseButtonGesture : QScroller::TouchGesture);
+}
+
+struct nm_switch_row {
+    QWidget *row;
+    QCheckBox *state;
+};
+
+static nm_switch_row nm_native_switch(QWidget *parent, const QString &text) {
+    auto ctor = reinterpret_cast<void (*)(QWidget *, QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN12ToggleSwitchC2EP7QWidget"));
+    auto setState = reinterpret_cast<void (*)(QWidget *, bool, bool)>(dlsym(RTLD_DEFAULT, "_ZN12ToggleSwitch8setStateEbb"));
+    if (!ctor || !setState || !nh_native_type("ToggleSwitch").isValid()) {
+        auto *fallback = new QCheckBox(text, parent);
+        return {fallback, fallback};
+    }
+    auto *row = new QWidget(parent);
+    auto *layout = new QHBoxLayout(row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    auto *label = new QLabel(text, row);
+    QFont labelFont = parent->font();
+    labelFont.setPixelSize(28);
+    label->setFont(labelFont);
+    layout->addWidget(label, 1);
+    auto *toggle = reinterpret_cast<QWidget *>(nm_native_storage("ToggleSwitch", 0));
+    if (!toggle) {
+        delete row;
+        auto *fallback = new QCheckBox(text, parent);
+        return {fallback, fallback};
+    }
+    ctor(toggle, row);
+    toggle->setFocusPolicy(Qt::NoFocus);
+    layout->addWidget(toggle);
+    auto *state = new QCheckBox(row);
+    state->hide();
+    if (!QObject::connect(toggle, SIGNAL(toggled(bool)), state, SLOT(setChecked(bool)))) {
+        delete row;
+        auto *fallback = new QCheckBox(text, parent);
+        return {fallback, fallback};
+    }
+    QObject::connect(state, &QCheckBox::toggled, row, [toggle, setState](bool checked) {
+        setState(toggle, checked, true);
+    });
+    setState(toggle, false, true);
+    row->setMinimumHeight(70);
+    return {row, state};
 }
 
 static QLineEdit *nm_native_line(QWidget *parent) {
@@ -639,26 +743,27 @@ static void nm_show_feature_settings() {
         "QTabBar::tab { border: 0; background: white; min-height: 58px; min-width: 150px; padding: 4px 8px; font-size: 25px; }"
         "QTabBar::tab:selected { border-bottom: 4px solid black; font-weight: bold; }"
         "QListWidget { border: 0; font-size: 30px; } QListWidget::item { min-height: 64px; }"
-        "QListWidget::item:selected { background: #dedede; color: black; border-bottom: 2px solid black; }"));
+        "QListWidget::item:selected { background: black; color: white; border: 0; }"));
     layout->addWidget(tabs);
     auto *scroll = new QScrollArea(tabs);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setWidgetResizable(true);
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    QScroller::grabGesture(scroll->viewport(), QScroller::TouchGesture);
+    nm_grab_scroll_gesture(scroll);
     auto *featureList = new QWidget(scroll);
     auto *rows = new QVBoxLayout(featureList);
     rows->setSpacing(8);
     QList<QCheckBox *> boxes;
     for (const auto &feature : nm_features) {
-        auto *box = nm_native_checkbox(featureList, QLatin1String(feature.label));
+        const auto switchRow = nm_native_switch(featureList, QLatin1String(feature.label));
+        auto *box = switchRow.state;
         box->setChecked(nm_feature_enabled(feature.key));
-        box->setMinimumHeight(70);
+        switchRow.row->setMinimumHeight(70);
         box->setFocusPolicy(Qt::NoFocus);
-        QFont font = box->font();
+        QFont font = switchRow.row->font();
         font.setPixelSize(26);
-        box->setFont(font);
-        rows->addWidget(box);
+        switchRow.row->setFont(font);
+        rows->addWidget(switchRow.row);
         boxes.append(box);
     }
     rows->addStretch();
@@ -676,7 +781,7 @@ static void nm_show_feature_settings() {
     menuItems->setFont(uiFont);
     menuItems->setSpacing(8);
     menuItems->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    QScroller::grabGesture(menuItems->viewport(), QScroller::TouchGesture);
+    nm_grab_scroll_gesture(menuItems);
     menuLayout->addWidget(nm_scroll_page(menuItems, menuPage));
     auto snapshots = QMap<QString, QByteArray>{};
     const bool editable = nm_read_ui_items(menuItems, &snapshots);
@@ -684,7 +789,7 @@ static void nm_show_feature_settings() {
     quickScroll->setFrameShape(QFrame::NoFrame);
     quickScroll->setWidgetResizable(true);
     quickScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    QScroller::grabGesture(quickScroll->viewport(), QScroller::TouchGesture);
+    nm_grab_scroll_gesture(quickScroll);
     auto *quickList = new QWidget(quickScroll);
     auto *quickRows = new QVBoxLayout(quickList);
     quickRows->setSpacing(8);
@@ -697,13 +802,14 @@ static void nm_show_feature_settings() {
     quickRows->addWidget(quickHint);
     QList<QCheckBox *> quickBoxes;
     for (const auto &shortcut : nm_shortcuts) {
-        auto *box = nm_native_checkbox(quickList, QLatin1String(shortcut.label));
+        const auto switchRow = nm_native_switch(quickList, QLatin1String(shortcut.label));
+        auto *box = switchRow.state;
         box->setChecked(nm_managed_shortcut(menuItems, shortcut));
-        box->setEnabled(editable);
+        switchRow.row->setEnabled(editable);
         box->setFocusPolicy(Qt::NoFocus);
-        box->setMinimumHeight(70);
-        box->setFont(uiFont);
-        quickRows->addWidget(box);
+        switchRow.row->setMinimumHeight(70);
+        switchRow.row->setFont(uiFont);
+        quickRows->addWidget(switchRow.row);
         quickBoxes << box;
         QObject::connect(box, &QCheckBox::toggled, view, [menuItems, boxes, shortcut](bool checked) {
             if (checked && !nm_managed_shortcut(menuItems, shortcut)) {
@@ -1241,6 +1347,12 @@ static const char *nm_main_menu_config(int index, const char *option) {
     return nm_global_config_experimental(buf);
 }
 
+static bool nm_write_default_icon(const char *path) {
+    const nh_resource &resource = nh_embedded_resources[0];
+    const QImage icon = QImage::fromData(resource.data, static_cast<int>(resource.size), "PNG");
+    return !icon.isNull() && icon.save(QString::fromLatin1(path), "PNG");
+}
+
 static void main_nav_button_configure(MainNavButton *btn, const char *label, const char *icon, const char *icon_fallback, const char *icon_active, const char *icon_active_fallback) {
     if (label && MainNavButton_setText) {
         MainNavButton_setText(btn, label);
@@ -1337,11 +1449,13 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
     }
 
     MainNavButton_MainNavButton(btn, parent);
+    const char *defaultIcon = "/tmp/nm_menu_default_icon.png";
+    const bool customIcon = nm_write_default_icon(defaultIcon);
     main_nav_button_configure(btn,
         nm_global_config_experimental("menu_main_15505_label") ?: "NickelMenu",
-        nm_global_config_experimental("menu_main_15505_icon"),
+        nm_global_config_experimental("menu_main_15505_icon") ?: (customIcon ? defaultIcon : nullptr),
         ":/images/home/main_nav_more.png",
-        nm_global_config_experimental("menu_main_15505_icon_active"),
+        nm_global_config_experimental("menu_main_15505_icon_active") ?: (customIcon ? defaultIcon : nullptr),
         ":/images/home/main_nav_more_active.png"
     );
     btn->setObjectName("nmButton");

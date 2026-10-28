@@ -773,6 +773,10 @@ NM_ACTION_(nickel_wifi) {
 }
 
 NM_ACTION_(nickel_orientation) {
+    // QVNC keeps a fixed framebuffer size: changing Qt's logical orientation
+    // rearranges Nickel without rotating the output and crops the screen.
+    if (QGuiApplication::platformName() == QLatin1String("vnc"))
+        NM_ERR_RET(nullptr, "screen rotation is unavailable in the QEMU VNC simulator");
     Qt::ScreenOrientation o;
     if      (!strcmp(arg, "portrait"))           o = Qt::PortraitOrientation;
     else if (!strcmp(arg, "landscape"))          o = Qt::LandscapeOrientation;
