@@ -145,6 +145,13 @@ The subsequent 6.0.279225 Settings build showed `Dropbox · NickelMenu tab *`
 immediately after its permission was switched off, with a legend below the
 list. The marker persisted after Apply and reopening Settings; the underlying
 `menu_item` line did not gain an asterisk.
+The next build replaced each tab's separate hint with descriptive text in its
+title bar, reduced and dimmed the marker legend, and grouped menu items by
+target. Duplicating Dark mode into While reading completed without a freeze;
+Apply wrote `menu_item:reader:Dark mode:nickel_setting:toggle:dark_mode`.
+The list paged with the While reading title and its item together on page 2.
+The updated binary also booted in the 5.18.270971 guest, whose VNC pointer
+input did not respond, so this UI flow was not verified there.
 In an earlier build, the arrow scrollbar's native layout was adjusted to give the track more of the
 list height. A VNC drag reached Book rescan without paging, and the down and up
 arrows moved the list to its last items and back to the start. A fresh 5.18

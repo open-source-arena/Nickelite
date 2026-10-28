@@ -17,6 +17,7 @@
 #include <QWidgetAction>
 #if NM_QT_MAJOR >= 6
 #include <QCheckBox>
+#include <QColor>
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -35,6 +36,7 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPointer>
+#include <QPair>
 #include <QSaveFile>
 #include <QScreen>
 #include <QScrollBar>
@@ -49,6 +51,7 @@
 #include <QWheelEvent>
 #endif
 
+#include <algorithm>
 #include <cstdlib>
 #include <climits>
 #include <cstring>
@@ -424,6 +427,48 @@ static QString nm_ui_item_text(const QStringList &fields) {
     return fields[3] + QStringLiteral("  ·  ") + nm_choice_label(fields[2]);
 }
 
+static void nm_group_ui_items(QListWidget *list) {
+    const QSignalBlocker block(list->model());
+    QListWidgetItem *selected = list->currentItem();
+    if (selected && selected->data(Qt::UserRole).toStringList().value(0).isEmpty()) selected = nullptr;
+    QList<QListWidgetItem *> items;
+    while (list->count()) {
+        auto *item = list->takeItem(0);
+        if (item->data(Qt::UserRole).toStringList().value(0).isEmpty()) delete item;
+        else items << item;
+    }
+    static const QStringList targets{QStringLiteral("main"), QStringLiteral("reader"),
+        QStringLiteral("browser"), QStringLiteral("library"), QStringLiteral("selection"),
+        QStringLiteral("selection_search")};
+    std::stable_sort(items.begin(), items.end(), [](QListWidgetItem *a, QListWidgetItem *b) {
+        const QString left = a->data(Qt::UserRole).toStringList().value(2);
+        const QString right = b->data(Qt::UserRole).toStringList().value(2);
+        const int li = targets.indexOf(left), ri = targets.indexOf(right);
+        if (li != ri) return (li < 0 ? targets.size() : li) < (ri < 0 ? targets.size() : ri);
+        return li < 0 && left < right;
+    });
+    QString previous;
+    for (auto *item : items) {
+        const QString target = item->data(Qt::UserRole).toStringList().value(2);
+        if (target != previous) {
+            auto *heading = new QListWidgetItem(target == QLatin1String("main")
+                ? QStringLiteral("NickelMenu") : nm_choice_label(target));
+            heading->setData(Qt::UserRole, QStringList{QString(), QStringLiteral("-1"), target,
+                QString(), QString(), QString()});
+            heading->setFlags(Qt::ItemIsEnabled);
+            heading->setBackground(QColor(QStringLiteral("#dedede")));
+            QFont font = list->font();
+            font.setPixelSize(23);
+            font.setBold(true);
+            heading->setFont(font);
+            list->addItem(heading);
+            previous = target;
+        }
+        list->addItem(item);
+    }
+    if (selected && items.contains(selected)) list->setCurrentItem(selected);
+}
+
 static bool nm_ui_action_blocked(const QString &name, const QString &argument, const QList<QCheckBox *> &boxes) {
     const QByteArray bytes = argument.toUtf8();
     const char *feature = nullptr;
@@ -507,7 +552,17 @@ public:
     void refresh() {
         const int count = list ? list->count() : rows.size();
         perPage = qMax(1, (frame->height() - 8) / rowHeight);
-        const int pages = qMax(1, (count + perPage - 1) / perPage);
+        listPages.clear();
+        if (list) {
+            for (int first = 0; first < count;) {
+                int last = qMin(first + perPage, count);
+                if (last < count && last > first + 1
+                    && list->item(last - 1)->data(Qt::UserRole).toStringList().value(0).isEmpty()) --last;
+                listPages << qMakePair(first, last);
+                first = last;
+            }
+        }
+        const int pages = list ? qMax(1, listPages.size()) : qMax(1, (count + perPage - 1) / perPage);
         bar->setRange(0, pages - 1);
         bar->setPageStep(1);
         bar->setVisible(pages > 1);
@@ -517,7 +572,10 @@ public:
     }
     void reveal(int row) {
         refresh();
-        bar->setValue(row / perPage);
+        if (list) {
+            for (int page = 0; page < listPages.size(); ++page)
+                if (row >= listPages[page].first && row < listPages[page].second) { bar->setValue(page); return; }
+        } else bar->setValue(row / perPage);
     }
 protected:
     bool eventFilter(QObject *object, QEvent *event) override {
@@ -573,8 +631,11 @@ private:
         refresh();
     }
     void display() {
-        const int first = bar->value() * perPage;
-        const int last = first + perPage;
+        const auto range = list && !listPages.isEmpty()
+            ? listPages[qMin(bar->value(), listPages.size() - 1)]
+            : qMakePair(bar->value() * perPage, (bar->value() + 1) * perPage);
+        const int first = range.first;
+        const int last = range.second;
         if (list) {
             if (list->currentRow() >= 0 && (list->currentRow() < first || list->currentRow() >= last))
                 list->setCurrentRow(-1);
@@ -596,6 +657,7 @@ private:
     QScrollBar *bar = nullptr;
     QListWidget *list = nullptr;
     QList<QWidget *> rows;
+    QList<QPair<int, int>> listPages;
     int rowHeight;
     int perPage = 1;
     int startY = INT_MIN;
@@ -796,9 +858,10 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
         const QStringList previous = existing && !duplicate ? existing->data(Qt::UserRole).toStringList()
                                               : QStringList{nm_ui_items_path, QStringLiteral("-1")};
         const QStringList fields{previous[0], previous[1], location.currentText(), label->text().trimmed(), action.currentText(), argument->text()};
-        auto *item = existing && !duplicate ? existing : new QListWidgetItem(list);
+        auto *item = existing && !duplicate ? existing : new QListWidgetItem;
         item->setData(Qt::UserRole, fields);
         item->setText(nm_ui_item_text(fields));
+        if (!existing || duplicate) { list->addItem(item); list->setCurrentItem(item); }
         guard->allow();
         editor->close();
     });
@@ -836,12 +899,9 @@ static void nm_show_feature_settings() {
     auto *permissionsPage = new QWidget(tabs);
     auto *permissionsLayout = new QVBoxLayout(permissionsPage);
     permissionsLayout->setContentsMargins(0, 0, 0, 0);
-    auto *permissionsHeading = new QLabel(QStringLiteral("ACTION PERMISSIONS"), permissionsPage);
+    auto *permissionsHeading = new QLabel(QStringLiteral("Manage the availability of different Menu items"), permissionsPage);
     permissionsHeading->setObjectName(QStringLiteral("nmSectionHeading"));
     permissionsLayout->addWidget(permissionsHeading);
-    auto *permissionsHint = new QLabel(QStringLiteral("Allow actions in menu items."), permissionsPage);
-    permissionsHint->setFont(uiFont);
-    permissionsLayout->addWidget(permissionsHint);
     auto *permissionsPageNumber = new QLabel(permissionsPage);
     permissionsPageNumber->setFont(uiFont);
     permissionsLayout->addWidget(permissionsPageNumber, 0, Qt::AlignRight);
@@ -872,12 +932,9 @@ static void nm_show_feature_settings() {
     auto *menuPage = new QWidget(tabs);
     auto *menuLayout = new QVBoxLayout(menuPage);
     menuLayout->setContentsMargins(0, 0, 0, 20);
-    auto *menuHeading = new QLabel(QStringLiteral("MENU ITEMS"), menuPage);
+    auto *menuHeading = new QLabel(QStringLiteral("Manage menu items on different menus"), menuPage);
     menuHeading->setObjectName(QStringLiteral("nmSectionHeading"));
     menuLayout->addWidget(menuHeading);
-    auto *hint = new QLabel(QStringLiteral("Select an item. Move within its config file."), menuPage);
-    hint->setFont(uiFont);
-    menuLayout->addWidget(hint);
     auto *menuPageNumber = new QLabel(menuPage);
     menuPageNumber->setFont(uiFont);
     menuLayout->addWidget(menuPageNumber, 0, Qt::AlignRight);
@@ -890,15 +947,35 @@ static void nm_show_feature_settings() {
     menuPager->setList(menuItems);
     menuLayout->addWidget(menuPager->widget(), 1);
     auto *blockedLegend = new QLabel(QStringLiteral("* Disabled because a permission is off."), menuPage);
-    blockedLegend->setFont(uiFont);
+    QFont legendFont = uiFont;
+    legendFont.setPixelSize(22);
+    blockedLegend->setFont(legendFont);
+    blockedLegend->setStyleSheet(QStringLiteral("color: #666;"));
     menuLayout->addWidget(blockedLegend);
     auto snapshots = QMap<QString, QByteArray>{};
     const bool editable = nm_read_ui_items(menuItems, &snapshots);
+    nm_group_ui_items(menuItems);
+    menuPager->refresh();
+    auto regroupPending = std::make_shared<bool>(false);
+    auto scheduleRegroup = [menuItems, menuPager, regroupPending] {
+        if (*regroupPending) return;
+        *regroupPending = true;
+        QTimer::singleShot(0, menuItems, [menuItems, menuPager, regroupPending] {
+            *regroupPending = false;
+            nm_group_ui_items(menuItems);
+            menuPager->refresh();
+            if (menuItems->currentRow() >= 0) menuPager->reveal(menuItems->currentRow());
+        });
+    };
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsInserted, view, scheduleRegroup);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::rowsRemoved, view, scheduleRegroup);
+    QObject::connect(menuItems->model(), &QAbstractItemModel::dataChanged, view, scheduleRegroup);
     auto refreshMarkers = [menuItems, boxes, snapshots] {
         const QSignalBlocker block(menuItems->model());
         for (int i = 0; i < menuItems->count(); ++i) {
             auto *item = menuItems->item(i);
             const QStringList fields = item->data(Qt::UserRole).toStringList();
+            if (fields.size() != 6 || fields[0].isEmpty()) continue;
             const QString text = nm_ui_item_text(fields)
                 + (nm_ui_item_blocked(fields, snapshots, boxes) ? QStringLiteral(" *") : QString());
             if (item->text() != text) item->setText(text);
@@ -914,12 +991,9 @@ static void nm_show_feature_settings() {
     auto *quickPage = new QWidget(tabs);
     auto *quickLayout = new QVBoxLayout(quickPage);
     quickLayout->setContentsMargins(0, 0, 0, 0);
-    auto *quickHeading = new QLabel(QStringLiteral("SHOW IN NICKELMENU"), quickPage);
+    auto *quickHeading = new QLabel(QStringLiteral("Manage items shown on main NickelMenu menu"), quickPage);
     quickHeading->setObjectName(QStringLiteral("nmSectionHeading"));
     quickLayout->addWidget(quickHeading);
-    auto *quickHint = new QLabel(QStringLiteral("Add or remove ready-made menu items."), quickPage);
-    quickHint->setFont(uiFont);
-    quickLayout->addWidget(quickHint);
     auto *quickPageNumber = new QLabel(quickPage);
     quickPageNumber->setFont(uiFont);
     quickLayout->addWidget(quickPageNumber, 0, Qt::AlignRight);
@@ -1003,9 +1077,13 @@ static void nm_show_feature_settings() {
             remove->setEnabled(editable && item);
             const int row = item ? menuItems->row(item) : -1;
             const QString source = item ? item->data(Qt::UserRole).toStringList().value(0) : QString();
-            moveUp->setEnabled(editable && row > 0 && menuItems->item(row - 1)->data(Qt::UserRole).toStringList().value(0) == source);
+            const QString target = item ? item->data(Qt::UserRole).toStringList().value(2) : QString();
+            moveUp->setEnabled(editable && !source.isEmpty() && row > 0
+                && menuItems->item(row - 1)->data(Qt::UserRole).toStringList().value(0) == source
+                && menuItems->item(row - 1)->data(Qt::UserRole).toStringList().value(2) == target);
             moveDown->setEnabled(editable && row >= 0 && row + 1 < menuItems->count()
-                && menuItems->item(row + 1)->data(Qt::UserRole).toStringList().value(0) == source);
+                && !source.isEmpty() && menuItems->item(row + 1)->data(Qt::UserRole).toStringList().value(0) == source
+                && menuItems->item(row + 1)->data(Qt::UserRole).toStringList().value(2) == target);
         });
     tabs->insertTab(1, menuPage, QStringLiteral("Menu items"));
     tabs->setCurrentIndex(0);
@@ -1023,8 +1101,10 @@ static void nm_show_feature_settings() {
         const int row = menuItems->currentRow();
         const int target = row + delta;
         if (row < 0 || target < 0 || target >= menuItems->count()) return;
-        if (menuItems->item(row)->data(Qt::UserRole).toStringList().value(0)
-            != menuItems->item(target)->data(Qt::UserRole).toStringList().value(0)) return;
+        const QStringList fields = menuItems->item(row)->data(Qt::UserRole).toStringList();
+        const QStringList neighbor = menuItems->item(target)->data(Qt::UserRole).toStringList();
+        if (fields.value(0).isEmpty() || fields.value(0) != neighbor.value(0)
+            || fields.value(2) != neighbor.value(2)) return;
         const QSignalBlocker block(menuItems->model());
         auto *item = menuItems->takeItem(row);
         menuItems->insertItem(target, item);
