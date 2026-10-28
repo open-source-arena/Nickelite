@@ -808,7 +808,7 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
     uiFont.setPixelSize(28);
     content->setFont(uiFont);
     auto *layout = new QVBoxLayout(content);
-    layout->setContentsMargins(22, 16, 22, 18);
+    layout->setContentsMargins(22, 16, 22, 20);
     layout->setSpacing(20);
     auto *form = new QFormLayout;
     form->setSpacing(18);
@@ -860,12 +860,22 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
     layout->addWidget(save);
     auto *version = new QLabel(QStringLiteral("Nickelite v" NH_VERSION), content);
     version->setAlignment(Qt::AlignCenter);
+    version->setMinimumHeight(48);
+    version->setContentsMargins(0, 16, 0, 0);
     version->setStyleSheet(QStringLiteral("color: #777; font-size: 18px;"));
     layout->addWidget(version);
     nm_native_set_content(editor, content);
-    QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, duplicate, location, label, action, argument, guard] {
-        if (label->text().trimmed().isEmpty() || label->text().contains(':') || label->text().contains('\n')
-            || label->text().contains('\r') || argument->text().contains('\n') || argument->text().contains('\r')) {
+    auto inputsValid = [label, argument] {
+        return !label->text().trimmed().isEmpty() && !label->text().contains(':')
+            && !label->text().contains('\n') && !label->text().contains('\r')
+            && !argument->text().contains('\n') && !argument->text().contains('\r');
+    };
+    auto updateDone = [save, inputsValid] { save->setEnabled(inputsValid()); };
+    QObject::connect(label, &QLineEdit::textChanged, editor, updateDone);
+    QObject::connect(argument, &QLineEdit::textChanged, editor, updateDone);
+    updateDone();
+    QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, duplicate, location, label, action, argument, guard, inputsValid] {
+        if (!inputsValid()) {
             nm_show_dialog(QStringLiteral("Menu item"), QStringLiteral("Enter a label without colons or line breaks, and a one-line argument."));
             return;
         }
@@ -897,7 +907,7 @@ static void nm_show_feature_settings() {
     uiFont.setPixelSize(28);
     content->setFont(uiFont);
     auto *layout = new QVBoxLayout(content);
-    layout->setContentsMargins(22, 8, 22, 18);
+    layout->setContentsMargins(22, 8, 22, 6);
     layout->setSpacing(6);
     auto *tabs = new QTabWidget(content);
     tabs->tabBar()->setFocusPolicy(Qt::NoFocus);
@@ -1160,6 +1170,8 @@ static void nm_show_feature_settings() {
     layout->addLayout(saveRow);
     auto *version = new QLabel(QStringLiteral("Nickelite v" NH_VERSION), content);
     version->setAlignment(Qt::AlignCenter);
+    version->setMinimumHeight(48);
+    version->setContentsMargins(0, 20, 0, 0);
     version->setStyleSheet(QStringLiteral("color: #777; font-size: 18px;"));
     layout->addWidget(version);
     auto refreshDirty = [isDirty, save, cancel, saveRow] {
