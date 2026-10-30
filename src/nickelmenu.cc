@@ -210,9 +210,10 @@ static bool nm_config_valid() {
 
 static QStringList nm_menu_fields(const QString &line) {
     const QString trimmed = line.trimmed();
-    if (trimmed.startsWith(QLatin1String("generator:"))) {
+    if (trimmed.startsWith(QLatin1String("generator"))) {
         const QStringList parts = trimmed.split(':');
-        if (parts.size() < 3 || parts[2] != QLatin1String("kfmon")) return {};
+        if (parts.size() < 3 || parts[0].trimmed() != QLatin1String("generator")
+            || parts[2].trimmed() != QLatin1String("kfmon")) return {};
         return {parts[1].trimmed(), QStringLiteral("KFMon launchers"), QStringLiteral("kfmon_generator"),
                 parts.size() > 3 ? parts.mid(3).join(':').trimmed() : QString()};
     }
@@ -522,6 +523,9 @@ static void nm_group_ui_items(QListWidget *list) {
 }
 
 static bool nm_ui_action_blocked(const QString &name, const QString &argument, const QList<QCheckBox *> &boxes) {
+    if (name == QLatin1String("kfmon_generator"))
+        for (qsizetype i = 0; i < boxes.size(); ++i)
+            if (!std::strcmp(nm_features[i].key, "kfmon")) return !boxes[i]->isChecked();
     const QByteArray bytes = argument.toUtf8();
     const char *feature = nullptr;
 #define X(action, qt5, qt6) if (name == QLatin1String(#action)) feature = nm_feature_for_action(NM_ACTION(action), bytes.constData());
@@ -941,8 +945,7 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
         const QStringList fields{previous[0], previous[1], location.currentText(), label->text().trimmed(),
             koreader ? QStringLiteral("cmd_spawn") : action.currentText(),
             koreader ? QStringLiteral("quiet:exec /mnt/onboard/.adds/koreader/koreader.sh")
-                : action.currentText() == QLatin1String("kfmon_generator")
-                    ? (existing && !duplicate ? oldFields[5] : QStringLiteral("gui")) : argument->text()};
+                : argument->text()};
         auto *item = existing && !duplicate ? existing : new QListWidgetItem;
         item->setData(Qt::UserRole, fields);
         item->setText(nm_ui_item_text(fields));
