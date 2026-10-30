@@ -56,6 +56,52 @@ NM_ACTION_(kfmon) {
     return nm_kfmon_return_handler(status);
 }
 
+#if NM_QT_MAJOR >= 6
+NM_ACTION_(kfmon_list) {
+    (void) arg;
+    kfmon_watch_list_t list = { 0 };
+    const int status = nm_kfmon_list_request("gui-list", &list);
+    if (nm_kfmon_error_handler(status)) {
+        kfmon_teardown_list(&list);
+        return NULL;
+    }
+    if (!list.count) {
+        kfmon_teardown_list(&list);
+        nm_action_result_t *empty = calloc(1, sizeof(*empty));
+        if (!empty)
+            NM_ERR_RET(NULL, "calloc: %m");
+        empty->type = NM_ACTION_RESULT_TYPE_LIST;
+        return empty;
+    }
+
+    nm_action_result_t *res = calloc(1, sizeof(*res));
+    if (!res) {
+        kfmon_teardown_list(&list);
+        NM_ERR_RET(NULL, "calloc: %m");
+    }
+    res->type = NM_ACTION_RESULT_TYPE_LIST;
+    res->list_labels = calloc(list.count, sizeof(*res->list_labels));
+    res->list_values = calloc(list.count, sizeof(*res->list_values));
+    if (!res->list_labels || !res->list_values) {
+        kfmon_teardown_list(&list);
+        nm_action_result_free(res);
+        NM_ERR_RET(NULL, "calloc: %m");
+    }
+    for (kfmon_watch_node_t *node = list.head; node; node = node->next) {
+        const size_t i = res->list_count++;
+        res->list_labels[i] = strdup(node->watch.label ? node->watch.label : node->watch.filename);
+        res->list_values[i] = strdup(node->watch.filename);
+        if (!res->list_labels[i] || !res->list_values[i]) {
+            kfmon_teardown_list(&list);
+            nm_action_result_free(res);
+            NM_ERR_RET(NULL, "strdup: %m");
+        }
+    }
+    kfmon_teardown_list(&list);
+    return res;
+}
+#endif
+
 NM_ACTION_(uninstall) {
     (void) arg;
     if (remove("/usr/local/Kobo/imageformats/libnm.so")) { // TODO: don't hardcode this

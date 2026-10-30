@@ -42,6 +42,10 @@ void nm_config_files_free(nm_config_file_t *files);
 // returned and nm_err is set. On success, the config is returned.
 nm_config_t *nm_config_parse(nm_config_file_t *files);
 
+// Identifies the exact shortcut row emitted by the 1.4.0 KFMon toggle.
+// `line` must already be trimmed, as it is in the config parser.
+bool nm_config_is_managed_kfmon_shortcut(const char *path, const char *line);
+
 // nm_config_generate runs all generators synchronously and sequentially. Any
 // previously generated items are automatically removed if updates are required.
 // If the config was modified, true is returned.

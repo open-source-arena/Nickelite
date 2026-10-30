@@ -11,6 +11,11 @@
 
 #include "action.h"
 #include "config.h"
+
+bool nm_config_is_managed_kfmon_shortcut(const char *path, const char *line) {
+    return path && line && !strcmp(path, NM_CONFIG_DIR "/zz-nm-settings.conf")
+        && !strcmp(line, "generator:main:kfmon:gui");
+}
 #include "generator.h"
 #include "nickelmenu.h"
 #include "util.h"
@@ -260,6 +265,20 @@ nm_config_t *nm_config_parse(nm_config_file_t *files) {
             char *cur = strtrim(line);
             if (!*cur || *cur == '#')
                 continue; // empty line or comment
+
+            if (nm_config_is_managed_kfmon_shortcut(cf->path, cur)) {
+                char managed_item[] = "main:KFMon launchers:kfmon_list:";
+                char *managed_fields = managed_item;
+                if (!nm_config_parse__line_item("menu_item", &managed_fields, &tmp_it, &tmp_act))
+                    RETERR("failed to migrate the managed KFMon launcher row");
+                if ((ret = nm_config_parse__append_item(&state, &tmp_it)))
+                    RETERR("file %s: line %d: error migrating KFMon launcher row: %s",
+                        cf->path, line_n, nm_config_parse__strerror(ret));
+                if ((ret = nm_config_parse__append_action(&state, &tmp_act)))
+                    RETERR("file %s: line %d: error migrating KFMon launcher action: %s",
+                        cf->path, line_n, nm_config_parse__strerror(ret));
+                continue;
+            }
 
             char *s_typ = strtrim(strsep(&cur, ":"));
 

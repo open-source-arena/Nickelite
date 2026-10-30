@@ -20,7 +20,6 @@
 #include <QColor>
 #include <QComboBox>
 #include <QDialog>
-#include <QDialogButtonBox>
 #include <QDir>
 #include <QEvent>
 #include <QFileInfo>
@@ -78,7 +77,7 @@ struct nm_feature {
 static constexpr nm_feature nm_features[] = {
     {"commands", "Commands and output"},
     {"koreader", "KOReader"},
-    {"kfmon", "KFMon launchers"},
+    {"kfmon", "KFMon actions"},
     {"settings", "Device settings"},
     {"dark_mode", "Dark mode"},
     {"screenshots", "Screenshots"},
@@ -102,6 +101,7 @@ struct nm_shortcut {
 
 static constexpr nm_shortcut nm_shortcuts[] = {
     {"KOReader", "cmd_spawn", "quiet:exec /mnt/onboard/.adds/koreader/koreader.sh", "koreader"},
+    {"KFMon launchers", "kfmon_list", "", "kfmon"},
     {"Dark mode", "nickel_setting", "toggle:dark_mode", "dark_mode"},
     {"Screenshot", "nickel_screenshot", "capture", "screenshots"},
     {"Rotate screen", "nickel_orientation", "swap", "orientation"},
@@ -123,8 +123,13 @@ static bool nm_kfmon_available() {
     return marker.isFile() && marker.isExecutable();
 }
 
+static bool nm_action_available(const char *action, bool kfmonAvailable) {
+    return (std::strcmp(action, "kfmon") && std::strcmp(action, "kfmon_id")
+            && std::strcmp(action, "kfmon_list")) || kfmonAvailable;
+}
+
 static bool nm_action_available(const char *action) {
-    return (std::strcmp(action, "kfmon") && std::strcmp(action, "kfmon_id")) || nm_kfmon_available();
+    return nm_action_available(action, nm_kfmon_available());
 }
 
 static bool nm_action_is_koreader(nm_action_fn_t action, const char *argument) {
@@ -134,12 +139,13 @@ static bool nm_action_is_koreader(nm_action_fn_t action, const char *argument) {
 
 static bool nm_shortcut_available(const nm_shortcut &shortcut) {
     if (!std::strcmp(shortcut.label, "KOReader")) return nm_koreader_available();
+    if (!std::strcmp(shortcut.label, "KFMon launchers")) return nm_kfmon_available();
     return true;
 }
 
 static const char *nm_feature_for_action(nm_action_fn_t action, const char *argument) {
     if (action == NM_ACTION(cmd_spawn) || action == NM_ACTION(cmd_output)) return "commands";
-    if (action == NM_ACTION(kfmon) || action == NM_ACTION(kfmon_id)) return "kfmon";
+    if (action == NM_ACTION(kfmon) || action == NM_ACTION(kfmon_id) || action == NM_ACTION(kfmon_list)) return "kfmon";
     if (action == NM_ACTION(nickel_screenshot)) return "screenshots";
     if (action == NM_ACTION(nickel_wifi)) return "wifi";
     if (action == NM_ACTION(nickel_browser)) return "browser";
@@ -224,6 +230,14 @@ static QStringList nm_menu_fields(const QString &line) {
             trimmed.mid(p2 + 1, p3 - p2 - 1).trimmed(), trimmed.mid(p3 + 1).trimmed()};
 }
 
+static QStringList nm_ui_item_fields(const QString &path, const QString &line) {
+    const QByteArray pathBytes = path.toUtf8();
+    const QByteArray lineBytes = line.trimmed().toUtf8();
+    if (nm_config_is_managed_kfmon_shortcut(pathBytes.constData(), lineBytes.constData()))
+        return {QStringLiteral("main"), QStringLiteral("KFMon launchers"), QStringLiteral("kfmon_list"), QString()};
+    return nm_menu_fields(line);
+}
+
 static QString nm_ui_item_text(const QStringList &fields);
 
 static bool nm_read_ui_items(QListWidget *list, QMap<QString, QByteArray> *snapshots) {
@@ -240,7 +254,7 @@ static bool nm_read_ui_items(QListWidget *list, QMap<QString, QByteArray> *snaps
         snapshots->insert(info.filePath(), data);
         const QStringList lines = QString::fromUtf8(data).split('\n');
         for (int i = 0; i < lines.size(); ++i) {
-            const QStringList parsed = nm_menu_fields(lines[i]);
+            const QStringList parsed = nm_ui_item_fields(info.filePath(), lines[i]);
             if (parsed.isEmpty()) continue;
             const QStringList fields{info.filePath(), QString::number(i), parsed[0], parsed[1], parsed[2], parsed[3]};
             auto *item = new QListWidgetItem(nm_ui_item_text(fields), list);
@@ -260,6 +274,13 @@ static QString nm_ui_item_line(const QStringList &fields) {
         return QLatin1String("generator:") + fields[2] + QLatin1String(":kfmon")
             + (fields[5].isEmpty() ? QString() : QLatin1String(":") + fields[5]);
     return QLatin1String("menu_item:") + fields.mid(2).join(':');
+}
+
+static bool nm_ui_item_inputs_valid(const QString &action, const QString &label, const QString &argument) {
+    const bool labelRequired = action != QLatin1String("kfmon_generator");
+    return (!labelRequired || (!label.trimmed().isEmpty() && !label.contains(':')
+            && !label.contains('\n') && !label.contains('\r')))
+        && !argument.contains('\n') && !argument.contains('\r');
 }
 
 static bool nm_write_ui_items(QListWidget *list, const QMap<QString, QByteArray> &snapshots) {
@@ -411,7 +432,14 @@ private:
     QSet<QWidget *> dialogs;
 };
 
-static QWidget *nm_native_view(const QString &title, QWidget *parent = nullptr) {
+static bool nm_queue_native_close(QWidget *view) {
+    if (!view || view->property("nmCloseQueued").toBool()) return false;
+    view->setProperty("nmCloseQueued", true);
+    QTimer::singleShot(0, view, [view] { view->close(); });
+    return true;
+}
+
+static QWidget *nm_native_view(const QString &title, QWidget *parent = nullptr, bool deferBackClose = false) {
     using NativeDialog = QWidget;
     auto ctor = reinterpret_cast<void (*)(NativeDialog *, QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN8N3DialogC2EP7QWidgetb"));
     auto setTitle = reinterpret_cast<void (*)(NativeDialog *, const QString &)>(dlsym(RTLD_DEFAULT, "_ZN8N3Dialog8setTitleERK7QString"));
@@ -440,7 +468,12 @@ static QWidget *nm_native_view(const QString &title, QWidget *parent = nullptr) 
     auto *shim = new QPushButton(view);
     shim->hide();
     if (QObject::connect(view, SIGNAL(backTapped()), shim, SIGNAL(pressed())))
-        QObject::connect(shim, &QPushButton::pressed, view, [view] { view->close(); });
+        QObject::connect(shim, &QPushButton::pressed, view, [view, deferBackClose] {
+            if (deferBackClose)
+                nm_queue_native_close(view);
+            else
+                view->close();
+        });
     return view;
 }
 
@@ -455,7 +488,8 @@ static QString nm_choice_label(const QString &key) {
         {"browser", "Web browser"}, {"library", "My Books filter"},
         {"selection", "Selected text"}, {"selection_search", "Selection search"},
         {"cmd_spawn", "Run a command"}, {"cmd_output", "Show command output"},
-        {"koreader_launcher", "Launch KOReader"}, {"kfmon_generator", "List KFMon launchers"},
+        {"koreader_launcher", "Launch KOReader"}, {"kfmon_list", "List KFMon launchers"},
+        {"kfmon_generator", "Generate KFMon launcher rows"},
         {"dbg_syslog", "Write to system log"}, {"dbg_error", "Show an error"},
         {"dbg_msg", "Show a message"}, {"dbg_toast", "Show a brief notice"},
         {"kfmon", "Launch a KFMon file"}, {"kfmon_id", "Launch a KFMon entry"},
@@ -522,15 +556,19 @@ static void nm_group_ui_items(QListWidget *list) {
     if (selected && items.contains(selected)) list->setCurrentItem(selected);
 }
 
-static bool nm_ui_action_blocked(const QString &name, const QString &argument, const QList<QCheckBox *> &boxes) {
-    if (name == QLatin1String("kfmon_generator"))
-        for (qsizetype i = 0; i < boxes.size(); ++i)
-            if (!std::strcmp(nm_features[i].key, "kfmon")) return !boxes[i]->isChecked();
+static const char *nm_ui_action_feature(const QString &name, const QString &argument) {
+    if (name == QLatin1String("kfmon_generator")) return "kfmon";
     const QByteArray bytes = argument.toUtf8();
     const char *feature = nullptr;
 #define X(action, qt5, qt6) if (name == QLatin1String(#action)) feature = nm_feature_for_action(NM_ACTION(action), bytes.constData());
     NM_ACTIONS
 #undef X
+    return feature;
+}
+
+static bool nm_ui_action_blocked(const QString &name, const QString &argument, const QList<QCheckBox *> &boxes) {
+    const QByteArray bytes = argument.toUtf8();
+    const char *feature = nm_ui_action_feature(name, argument);
     if (!feature) return false;
     for (qsizetype i = 0; i < boxes.size(); ++i)
         if (!std::strcmp(nm_features[i].key, feature) && !boxes[i]->isChecked()) return true;
@@ -723,6 +761,115 @@ private:
     bool swiped = false;
 };
 
+static void nm_show_kfmon_picker(const QString &title, const nm_action_result_t *result) {
+    QWidget *view = nm_native_view(title, nullptr, true);
+    if (!view) {
+        nm_show_dialog(title, QStringLiteral("Kobo's native launcher list is unavailable on this firmware."));
+        return;
+    }
+
+    QStringList watchFiles;
+    for (size_t i = 0; i < result->list_count; ++i)
+        watchFiles << QString::fromUtf8(result->list_values[i]);
+
+    auto *content = new QWidget(view);
+    QFont uiFont = content->font();
+    uiFont.setPixelSize(28);
+    content->setFont(uiFont);
+    auto *layout = new QVBoxLayout(content);
+    layout->setContentsMargins(22, 8, 22, 6);
+    layout->setSpacing(6);
+    auto *heading = new QLabel(result->list_count
+        ? QStringLiteral("Select a launcher to start it")
+        : QStringLiteral("No configured launchers. Add watches under .adds/kfmon/config."), content);
+    heading->setObjectName(QStringLiteral("nmSectionHeading"));
+    heading->setWordWrap(true);
+    heading->setStyleSheet(QStringLiteral("background: #dedede; padding: 7px 12px; font-size: 23px;"));
+    layout->addWidget(heading);
+    auto *pageNumber = new QLabel(content);
+    pageNumber->setFont(uiFont);
+    layout->addWidget(pageNumber, 0, Qt::AlignRight);
+    auto *pager = new NmPagedFrame(content, pageNumber, 76);
+    auto *list = new QListWidget(content);
+    list->setSelectionMode(QAbstractItemView::SingleSelection);
+    list->setStyleSheet(QStringLiteral(
+        "QListWidget { border: 0; font-size: 30px; } "
+        "QListWidget::item { min-height: 76px; border-bottom: 1px solid #aaa; } "
+        "QListWidget::item:selected { background: black; color: white; border: 0; }"));
+    QStringList labels;
+    for (size_t i = 0; i < result->list_count; ++i) {
+        QString label = QString::fromUtf8(result->list_labels[i]);
+        if (labels.contains(label))
+            label += QStringLiteral(" (") + QString::fromUtf8(result->list_values[i]) + QLatin1Char(')');
+        while (labels.contains(label)) label += QLatin1Char(' ');
+        labels << label;
+        auto *item = new QListWidgetItem(label, list);
+        item->setData(Qt::UserRole, static_cast<qulonglong>(i));
+    }
+    if (!result->list_count) {
+        auto *empty = new QListWidgetItem(QStringLiteral("No configured launchers"), list);
+        empty->setFlags(Qt::NoItemFlags);
+    } else {
+        list->setCurrentRow(0);
+    }
+    pager->setList(list);
+    layout->addWidget(pager->widget(), 1);
+    nm_native_set_content(view, content);
+
+    auto getActive = reinterpret_cast<QWidget *(*)(QWidget *)>(dlsym(RTLD_DEFAULT, "_ZN11MainNavView18getActiveNavButtonEv"));
+    auto setActive = reinterpret_cast<void (*)(QWidget *, bool)>(dlsym(RTLD_DEFAULT, "_ZN13MainNavButton9setActiveEb"));
+    QWidget *nav = nullptr;
+    QWidget *menuTab = nullptr;
+    for (QWidget *widget : QApplication::allWidgets()) {
+        if (widget->inherits("MainNavView")) nav = widget;
+        if (widget->objectName() == QLatin1String("nmButton")) menuTab = widget;
+    }
+    QPointer<QWidget> previous = nav && getActive ? getActive(nav) : nullptr;
+    QPointer<QWidget> tab = menuTab;
+    auto restoreNav = std::make_shared<bool>(true);
+    if (setActive && tab) {
+        if (previous && previous != tab) setActive(previous, false);
+        setActive(tab, true);
+        for (QWidget *button : QApplication::allWidgets()) {
+            if (!button->inherits("MainNavButton") || button == tab) continue;
+            auto *shim = new QPushButton(view);
+            shim->hide();
+            if (QObject::connect(button, SIGNAL(tapped()), shim, SIGNAL(pressed())))
+                QObject::connect(shim, &QPushButton::pressed, view, [view, button, tab, restoreNav, setActive] {
+                    *restoreNav = false;
+                    if (tab) setActive(tab, false);
+                    setActive(button, true);
+                    nm_queue_native_close(view);
+                });
+        }
+        QObject::connect(view, &QObject::destroyed, [previous, tab, restoreNav, setActive] {
+            if (tab) setActive(tab, false);
+            if (*restoreNav && previous) setActive(previous, true);
+        });
+    }
+    QObject::connect(list, &QListWidget::itemClicked, view, [watchFiles, title, view](QListWidgetItem *item) {
+        if (!(item->flags() & Qt::ItemIsEnabled)) return;
+        const int selected = static_cast<int>(item->data(Qt::UserRole).toULongLong());
+        if (selected < 0 || selected >= watchFiles.size()) return;
+        const QString watchFile = watchFiles[selected];
+        if (!nm_queue_native_close(view)) return;
+        QObject::connect(view, &QObject::destroyed, qApp, [title, watchFile] {
+            QTimer::singleShot(0, qApp, [title, watchFile] {
+                const QByteArray argument = watchFile.toUtf8();
+                nm_err_set(nullptr);
+                nm_action_result_t *launch = nm_action_kfmon(argument.constData());
+                if (const char *error = nm_err()) {
+                    const QString message = QString::fromUtf8(error);
+                    nm_err_set(nullptr);
+                    nm_show_dialog(title, message);
+                }
+                nm_action_result_free(launch);
+            });
+        });
+    });
+    view->show();
+}
+
 struct nm_switch_row {
     QWidget *row;
     QCheckBox *state;
@@ -873,6 +1020,7 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
 #undef X
     if (existing && !actions.contains(oldFields[4])) actions << oldFields[4];
     if (nm_koreader_available()) actions << QStringLiteral("koreader_launcher");
+    if (nm_kfmon_available()) actions << QStringLiteral("kfmon_generator");
     const bool existingKoreader = existing && oldFields[4] == QLatin1String("cmd_spawn")
         && oldFields[5].trimmed() == QLatin1String("quiet:exec /mnt/onboard/.adds/koreader/koreader.sh");
     const bool showKoreaderPreset = nm_koreader_available();
@@ -883,7 +1031,6 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
     if (existing) {
         label->setText(oldFields[3]);
         argument->setText(oldFields[5]);
-        if (oldFields[4] == QLatin1String("kfmon_generator")) label->setEnabled(false);
     }
     const QString initialLocation = existing ? oldFields[2] : QStringLiteral("main");
     const QString initialAction = existingKoreader && showKoreaderPreset ? QStringLiteral("koreader_launcher")
@@ -921,18 +1068,39 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
     version->setStyleSheet(QStringLiteral("color: #777; font-size: 18px;"));
     layout->addWidget(version);
     nm_native_set_content(editor, content);
-    auto inputsValid = [label, argument] {
-        return !label->text().trimmed().isEmpty() && !label->text().contains(':')
-            && !label->text().contains('\n') && !label->text().contains('\r')
-            && !argument->text().contains('\n') && !argument->text().contains('\r');
+    auto inputsValid = [label, argument, action] {
+        return nm_ui_item_inputs_valid(action.currentText(), label->text(), argument->text());
     };
     auto updateDone = [save, inputsValid] { save->setEnabled(inputsValid()); };
+    auto updateActionFields = [label, action, argument, updateDone] {
+        const bool kfmonGenerator = action.currentText() == QLatin1String("kfmon_generator");
+        label->setEnabled(!kfmonGenerator);
+        if (kfmonGenerator) label->setText(QStringLiteral("KFMon launchers"));
+        else if (action.currentText() == QLatin1String("kfmon_list") && label->text().trimmed().isEmpty())
+            label->setText(QStringLiteral("KFMon launchers"));
+        if (action.currentText() == QLatin1String("kfmon"))
+            argument->setPlaceholderText(QStringLiteral("KFMon trigger filename basename"));
+        else if (action.currentText() == QLatin1String("kfmon_id"))
+            argument->setPlaceholderText(QStringLiteral("Advanced: numeric ID may change or retarget"));
+        else if (action.currentText() == QLatin1String("kfmon_list"))
+            argument->setPlaceholderText(QStringLiteral("No argument required"));
+        else if (kfmonGenerator)
+            argument->setPlaceholderText(QStringLiteral("gui or all"));
+        else
+            argument->setPlaceholderText(QStringLiteral("Optional action argument"));
+        updateDone();
+    };
     QObject::connect(label, &QLineEdit::textChanged, editor, updateDone);
     QObject::connect(argument, &QLineEdit::textChanged, editor, updateDone);
-    updateDone();
+    updateActionFields();
+    auto *actionChanged = new QTimer(editor);
+    actionChanged->setSingleShot(true);
+    actionChanged->setInterval(0);
+    QObject::connect(actionChanged, &QTimer::timeout, editor, updateActionFields);
+    QObject::connect(action.widget, SIGNAL(currentIndexChanged(int)), actionChanged, SLOT(start()));
     QObject::connect(save, &QPushButton::clicked, editor, [editor, list, existing, duplicate, location, label, action, argument, guard, inputsValid, oldFields] {
         if (!inputsValid()) {
-            nm_show_dialog(QStringLiteral("Menu item"), QStringLiteral("Enter a label without colons or line breaks, and a one-line argument."));
+            nm_show_dialog(QStringLiteral("Menu item"), QStringLiteral("Use a nonempty label without colons or line breaks, and a one-line argument. A KFMon launcher list does not need a label."));
             return;
         }
         if (action.currentText() == QLatin1String("kfmon_generator") && duplicate) {
@@ -942,7 +1110,9 @@ static void nm_edit_ui_item(QListWidget *list, QListWidgetItem *existing, bool d
         const QStringList previous = existing && !duplicate ? existing->data(Qt::UserRole).toStringList()
                                               : QStringList{nm_ui_items_path, QStringLiteral("-1")};
         const bool koreader = action.currentText() == QLatin1String("koreader_launcher");
-        const QStringList fields{previous[0], previous[1], location.currentText(), label->text().trimmed(),
+        const bool kfmonGenerator = action.currentText() == QLatin1String("kfmon_generator");
+        const QStringList fields{previous[0], previous[1], location.currentText(),
+            kfmonGenerator ? QStringLiteral("KFMon launchers") : label->text().trimmed(),
             koreader ? QStringLiteral("cmd_spawn") : action.currentText(),
             koreader ? QStringLiteral("quiet:exec /mnt/onboard/.adds/koreader/koreader.sh")
                 : argument->text()};
@@ -1167,29 +1337,6 @@ static void nm_show_feature_settings() {
     menuButtons->addWidget(moveDown, 1, 0);
     menuButtons->addWidget(duplicate, 1, 1);
     menuButtons->addWidget(remove, 1, 2);
-    if (nm_kfmon_available()) {
-        auto *addKfmon = new QPushButton(QStringLiteral("Add KFMon launcher list"), menuPage);
-        nm_native_style_button(addKfmon);
-        addKfmon->setMinimumHeight(56);
-        QFont kfmonFont = uiFont;
-        kfmonFont.setPixelSize(25);
-        addKfmon->setFont(kfmonFont);
-        addKfmon->setEnabled(editable);
-        menuButtons->addWidget(addKfmon, 2, 0, 1, 3);
-        QObject::connect(addKfmon, &QPushButton::clicked, view, [menuItems] {
-            for (int i = 0; i < menuItems->count(); ++i)
-                if (menuItems->item(i)->data(Qt::UserRole).toStringList().value(4) == QLatin1String("kfmon_generator")) {
-                    menuItems->setCurrentItem(menuItems->item(i));
-                    return;
-                }
-            const QStringList fields{nm_ui_items_path, QStringLiteral("-1"), QStringLiteral("main"),
-                QStringLiteral("KFMon launchers"), QStringLiteral("kfmon_generator"), QStringLiteral("gui")};
-            auto *item = new QListWidgetItem(nm_ui_item_text(fields));
-            item->setData(Qt::UserRole, fields);
-            menuItems->addItem(item);
-            menuItems->setCurrentItem(item);
-        });
-    }
     menuLayout->addLayout(menuButtons);
     QObject::connect(menuItems, &QListWidget::currentItemChanged, view,
         [menuItems, edit, duplicate, remove, moveUp, moveDown, editable](QListWidgetItem *item) {
@@ -2344,7 +2491,7 @@ void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *a
             continue;
         }
 
-        NM_LOG("...result: type=%d msg='%s', handling...", res->type, res->msg);
+        NM_LOG("...result: type=%d msg='%s', handling...", res->type, res->msg ? res->msg : "");
 
         MainWindowController *mwc;
         switch (res->type) {
@@ -2365,6 +2512,13 @@ void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *a
             }
             MainWindowController_toast(mwc, QString::fromUtf8(res->msg), QStringLiteral(""), 1500);
             break;
+        case NM_ACTION_RESULT_TYPE_LIST: {
+#if NM_QT_MAJOR >= 6
+            nm_show_kfmon_picker(QString::fromUtf8(it->lbl), res);
+            skip = -1;
+#endif
+            break;
+        }
         case NM_ACTION_RESULT_TYPE_SKIP:
             skip = res->skip;
             break;

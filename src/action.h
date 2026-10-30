@@ -1,5 +1,6 @@
 #ifndef NM_ACTION_H
 #define NM_ACTION_H
+#include <stddef.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -9,12 +10,16 @@ typedef enum {
     NM_ACTION_RESULT_TYPE_MSG    = 1,
     NM_ACTION_RESULT_TYPE_TOAST  = 2,
     NM_ACTION_RESULT_TYPE_SKIP   = 3, // for use by skip only
+    NM_ACTION_RESULT_TYPE_LIST   = 4, // selection list for interactive actions
 } nm_action_result_type_t;
 
 typedef struct {
     nm_action_result_type_t type;
     char *msg;
     int skip; // for use by skip only
+    char **list_labels;
+    char **list_values;
+    size_t list_count;
 } nm_action_result_t;
 
 // nm_action_fn_t represents an action. On success, a nm_action_result_t is
@@ -55,6 +60,7 @@ void nm_action_result_free(nm_action_result_t *res);
     X(dbg_toast,          1, 1)   \
     X(kfmon,              1, 1)   \
     X(kfmon_id,           1, 1)   \
+    X(kfmon_list,         0, 1)   \
     X(nickel_setting,     1, 1)   \
     X(nickel_extras,      1, 0)   \
     X(nickel_browser,     1, 1)   \

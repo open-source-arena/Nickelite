@@ -4,7 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = 'open-source-arena/Nickelite'
-$version = '1.3.0'
+$version = '1.4.0'
 $asset = 'KFMon-Nickelite-Install.zip'
 $root = (Resolve-Path $KoboDrive).Path
 $versionFile = Join-Path $root '.kobo/version'

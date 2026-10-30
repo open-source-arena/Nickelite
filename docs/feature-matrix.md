@@ -1,4 +1,4 @@
-# Upstream NickelMenu v0.6.0 compared with Nickelite 1.3.0 on Kobo 5+
+# Upstream NickelMenu v0.6.0 compared with Nickelite 1.4.0 on Kobo 5+
 
 This inventory uses the upstream [v0.6.0 documentation](https://github.com/pgaskin/NickelMenu/tree/v0.6.0), its tagged `Makefile` and source, plus this branch's action registry and the [physical compatibility report](firmware-6.0.279225.md). “Implemented” means the action exists and checks its runtime dependencies; it does not mean every subaction was tested on the N365. The physical results below apply to Clara BW (N365) on 6.0.279225.
 
@@ -31,9 +31,9 @@ for a full-rootfs replacement.
 | Action chains: success, failure, always, and `skip` | Implemented; disabled features fail normally so `chain_failure` can run. | Configure chains; `skip` stays available for recovery. |
 | Selection substitution and transforms | Implemented, including the corrected `u` and `x` flags. | Use selection menu entries. |
 | `cmd_spawn` and `cmd_output` | Implemented; command execution itself is not a Kobo 6 compatibility guarantee. | **Commands and output** switch; add config entries. |
-| KOReader launcher | Ready-made `cmd_spawn` shortcut uses KOReader's standard Kobo script. KOReader must be installed separately. On N365 firmware 6, v2026.07.1 launched and responded; `Exit > Exit` froze during boot animation, while `Exit > Reboot device` returned to Nickel. | Install KOReader under `.adds/koreader`, then turn on **KOReader** in Shortcuts. KOReader is not bundled. |
+| KOReader launcher | Ready-made `cmd_spawn` shortcut uses KOReader's standard Kobo script. KOReader must be installed separately. On Clara BW (N365) firmware 6.0.279225, v2026.07.1 launched and responded; `Exit > Exit` froze during boot animation and required power recovery, while `Exit > Reboot device` returned to Nickel. Use the reboot option on this tested device; other firmware/models are unverified. | Install KOReader under `.adds/koreader`, then turn on **KOReader** in Shortcuts. KOReader is not bundled. |
 | `dbg_syslog`, `dbg_error`, `dbg_msg`, `dbg_toast` | Implemented; always available for diagnostics and config errors. | Add config entries. |
-| `kfmon`, `kfmon_id`, and KFMon menu generator | Implemented; requires KFMon installed separately. A Nickelite KFMon fork package installed and passed an IPC-only generator/action check on physical N365 firmware 6.0.279225; firmware 5.18 OTA stage1 was simulated only. | Use the optional KFMon installer in the release, then add action or generator entries. |
+| `kfmon_list`, `kfmon`, `kfmon_id`, and KFMon menu generator | Installed-only list/file/entry actions share the **KFMon actions** permission. On physical Clara BW (N365) firmware 6.0.279225, Back and My Books tab both closed the native picker without a crash; a **Save device status** IPC-only watch ran and wrote the expected report. Permissions and Action choices were confirmed. Firmware 5.18 OTA stage1 was simulated only. | Use the optional KFMon installer and configure watches under `.adds/kfmon/config`. Turn on **KFMon launchers** in Shortcuts or add **List KFMon launchers**, **Launch a KFMon file**, or **Launch a KFMon entry** in Menu items. The shortcut remains as one row when no GUI-visible watches are configured and shows an empty-state row with guidance. |
 | `_test` numbered menu generator | Implemented as a configuration test utility. | Add `generator:_test` with its location and count. |
 | `nickel_setting`: invert, lockscreen, force Wi-Fi | Implemented with native ABI checks; hardware and preference effects need physical checks. | **Device settings** switch; add entries. |
 | `nickel_setting:dark_mode` | Implemented; reader appearance passed the 6.0.274403 simulator test. | **Dark mode** switch; add entry. |
@@ -53,7 +53,7 @@ for a full-rootfs replacement.
 
 The built-in **Nickelite Settings** view has **Shortcuts**, **Menu items**, and
 **Permissions** tabs. Shortcuts generate or remove ready-made menu items for
-KOReader, dark mode, screenshots, rotation, Dropbox, Google Drive, Wi-Fi, Sleep, Restart,
+KOReader, KFMon launcher list (when installed), dark mode, screenshots, rotation, Dropbox, Google Drive, Wi-Fi, Sleep, Restart,
 and Power off. Editing a generated item makes it a custom item; the shortcut
 switch no longer owns it. Permissions control the supported action groups
 above. All permissions default to on. Apply changes writes the hidden

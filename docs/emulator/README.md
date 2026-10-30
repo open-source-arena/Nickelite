@@ -39,6 +39,52 @@ control. A configured IPC-only watch appeared in the generated list; its safe
 removed afterward. Physical firmware 5 installation, firmware 6 uninstall, and
 rollback remain untested.
 
+## Nickelite 1.4.0 QEMU UI screenshots and KFMon Settings checks
+
+The screenshots below were captured from genuine Nickel 6.0.279225 in an
+isolated QEMU ARM userspace guest. The guest used a synthetic full battery, a
+fresh sideloaded profile, the 1.4.0 `libnm.so`, official KOReader v2026.07.1
+files on onboard storage, and the KFMon fork's 1.4.6 daemon binary payload in
+its installed rootfs path. They show the installed-only app detections,
+Shortcuts, Permissions, main menu, and KFMon action choices. They do **not** establish that
+KOReader launches or that the KFMon daemon can run in QEMU. In particular, the
+headless guest lacks `/dev/fb0`, which KFMon's FBInk initialization requires.
+The QEMU run also reported `/dev/mmcblk0` unavailable, but Nickel created its
+user databases and rendered the UI. The display was recovered by using the
+repository's rebuilt `libqvnc-repaint.so`; the simulator image's older VNC
+plugin rendered only a blank canvas.
+
+<p align="center"><a href="../screenshots/qemu-fw6-nickelite-launchers-1.4.0.jpg"><img src="../screenshots/qemu-fw6-nickelite-launchers-1.4.0.jpg" alt="QEMU Nickel main menu with Nickelite and KOReader and KFMon entries" width="45%"></a> <a href="../screenshots/qemu-fw6-shortcuts-1.4.0.jpg"><img src="../screenshots/qemu-fw6-shortcuts-1.4.0.jpg" alt="QEMU Nickelite Shortcuts with installed KOReader and KFMon toggles" width="45%"></a></p>
+<p align="center"><em>Genuine QEMU guest UI, firmware 6.0.279225; installed detection and UI only.</em></p>
+
+<p align="center"><a href="../screenshots/qemu-fw6-permissions-1.4.0.jpg"><img src="../screenshots/qemu-fw6-permissions-1.4.0.jpg" alt="QEMU Nickelite Permissions showing KOReader and KFMon actions" width="45%"></a> <a href="../screenshots/qemu-fw6-kfmon-actions-1.4.0.jpg"><img src="../screenshots/qemu-fw6-kfmon-actions-1.4.0.jpg" alt="QEMU Action picker showing KFMon file, entry, and list actions" width="45%"></a></p>
+<p align="center"><em>QEMU firmware 6 Permissions and Action choices. See the separate physical picker image in the root README for device results.</em></p>
+
+The 1.4.0 Settings UI makes the KFMon launcher picker a detected-only Shortcuts
+toggle and normal Menu items Action choice. `Launch a KFMon file`,
+`Launch a KFMon entry`, and `List KFMon launchers` share the installed-only
+**KFMon actions** permission. The picker lists configured GUI-visible watches
+and has an empty state. Qt 6 compatibility and ARM compatibility tests passed
+under firmware 5 and firmware 6 userlands.
+
+On a physical Clara BW (N365) running firmware 6.0.279225, Home and Settings
+remained responsive. The picker opened with the configured **Save device
+status** watch. Back closed it; opening it again and tapping My Books also
+closed it and made that tab active. Selecting the watch produced a KFMon
+success notification and wrote `.adds/kfmon/device-status.txt` with timestamp,
+uptime, battery percentage, and free onboard space. The Settings check
+confirmed the **KFMon actions** permission and List/File/Entry Action choices;
+the Shortcuts toggle added and removed one KFMon menu row. No crash occurred
+in these checks.
+
+The device-status watch is an optional documentation example, not installed by
+Nickelite. Firmware 5 physical picker testing, other Kobo models, and KFMon
+uninstall/rollback remain unverified. KOReader v2026.07.1 on the tested Clara BW
+launched and responded, but `Exit > Exit` froze on the boot animation and
+required a non-erasing power cycle; `Exit > Reboot device` returned to Nickel.
+Use the reboot option on that tested device; other firmware/models remain
+unverified.
+
 ## Nickelite 1.1.1 screenshot check (2026-10-29)
 
 The Shortcuts, Menu items, and Permissions screenshots were recaptured on the

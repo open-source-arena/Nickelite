@@ -33,6 +33,12 @@ void nm_action_result_free(nm_action_result_t *res) {
         return;
     if (res->msg)
         free(res->msg);
+    for (size_t i = 0; i < res->list_count; i++) {
+        free(res->list_labels[i]);
+        free(res->list_values[i]);
+    }
+    free(res->list_labels);
+    free(res->list_values);
     free(res);
 }
 

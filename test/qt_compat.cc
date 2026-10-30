@@ -59,8 +59,57 @@ int main(int argc, char **argv) {
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_setting), "enable:screenshots"), "screenshots"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_misc), "force_usb_connection"), "usb"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_misc), "rescan_books"), "book_scan"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(kfmon), "watch.png"), "kfmon"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(kfmon_id), "watch-id"), "kfmon"));
+    assert(!std::strcmp(nm_feature_for_action(NM_ACTION(kfmon_list), ""), "kfmon"));
+    assert(!std::strcmp(nm_ui_action_feature(QStringLiteral("kfmon"), "watch.png"), "kfmon"));
+    assert(!std::strcmp(nm_ui_action_feature(QStringLiteral("kfmon_id"), "watch-id"), "kfmon"));
+    assert(!std::strcmp(nm_ui_action_feature(QStringLiteral("kfmon_generator"), "gui"), "kfmon"));
+    assert(!std::strcmp(nm_ui_action_feature(QStringLiteral("kfmon_list"), ""), "kfmon"));
+    assert(nm_config_is_managed_kfmon_shortcut(NM_CONFIG_DIR "/zz-nm-settings.conf", "generator:main:kfmon:gui"));
+    assert(!nm_config_is_managed_kfmon_shortcut(NM_CONFIG_DIR "/custom.conf", "generator:main:kfmon:gui"));
+    assert(!nm_config_is_managed_kfmon_shortcut(NM_CONFIG_DIR "/zz-nm-settings.conf", "generator:reader:kfmon:gui"));
+    assert(!nm_action_available("kfmon", false) && !nm_action_available("kfmon_id", false)
+        && !nm_action_available("kfmon_list", false));
+    assert(nm_action_available("kfmon", true) && nm_action_available("kfmon_id", true)
+        && nm_action_available("kfmon_list", true));
+    assert(nm_action_available("dbg_msg", false));
     assert(!nm_feature_for_action(NM_ACTION(uninstall), ""));
     assert(!nm_feature_for_action(NM_ACTION(skip), "1"));
+
+    bool foundKfmonPermission = false;
+    for (const auto &feature : nm_features)
+        if (!std::strcmp(feature.key, "kfmon")) {
+            assert(!std::strcmp(feature.label, "KFMon actions"));
+            foundKfmonPermission = true;
+        }
+    assert(foundKfmonPermission);
+    bool foundKfmonShortcut = false;
+    for (const auto &shortcut : nm_shortcuts)
+        if (!std::strcmp(shortcut.label, "KFMon launchers")) {
+            assert(!std::strcmp(shortcut.action, "kfmon_list"));
+            assert(!std::strcmp(shortcut.argument, ""));
+            assert(!std::strcmp(shortcut.permission, "kfmon"));
+            foundKfmonShortcut = true;
+        }
+    assert(foundKfmonShortcut);
+    assert(nm_choice_label(QStringLiteral("kfmon")) == QStringLiteral("Launch a KFMon file"));
+    assert(nm_choice_label(QStringLiteral("kfmon_id")) == QStringLiteral("Launch a KFMon entry"));
+    assert(nm_choice_label(QStringLiteral("kfmon_list")) == QStringLiteral("List KFMon launchers"));
+    assert(nm_choice_label(QStringLiteral("kfmon_generator")) == QStringLiteral("Generate KFMon launcher rows"));
+    assert(nm_ui_item_inputs_valid(QStringLiteral("kfmon_generator"), QString(), QStringLiteral("gui")));
+    assert(!nm_ui_item_inputs_valid(QStringLiteral("kfmon"), QString(), QString()));
+    assert(!nm_ui_item_inputs_valid(QStringLiteral("kfmon_generator"), QString(), QStringLiteral("gui\n")));
+    assert(nm_ui_item_fields(nm_ui_items_path, QStringLiteral("generator:main:kfmon:gui"))
+        == QStringList({QStringLiteral("main"), QStringLiteral("KFMon launchers"), QStringLiteral("kfmon_list"), QString()}));
+    assert(nm_ui_item_fields(QStringLiteral(".adds/nm/custom.conf"), QStringLiteral("generator:main:kfmon:gui"))
+        == QStringList({QStringLiteral("main"), QStringLiteral("KFMon launchers"), QStringLiteral("kfmon_generator"), QStringLiteral("gui")}));
+    assert(nm_ui_item_line({QStringLiteral("settings"), QStringLiteral("-1"), QStringLiteral("main"),
+        QStringLiteral("KFMon launchers"), QStringLiteral("kfmon_generator"), QStringLiteral("gui")})
+        == QStringLiteral("generator:main:kfmon:gui"));
+    assert(nm_ui_item_line({QStringLiteral("settings"), QStringLiteral("-1"), QStringLiteral("main"),
+        QStringLiteral("KFMon launchers"), QStringLiteral("kfmon_list"), QString()})
+        == QStringLiteral("menu_item:main:KFMon launchers:kfmon_list:"));
 
     Device_isSpaKoboBW = test_model_support;
     Device_supportsDropbox = test_original_dropbox_support;
