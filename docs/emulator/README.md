@@ -6,6 +6,15 @@ plugin loading and selected actions. This is a userspace approximation, not a
 booted Kobo board. See [action results](../action-compatibility-6.md) and
 [full-system feasibility](../emulator-board-feasibility.md).
 
+## Nickelite 1.2.0 build checks (2026-10-30)
+
+The Qt 6 cross-build completed with `make -j8 all kobo test/qt_compat test/compat`.
+`test/compat` and `test/qt_compat` passed in the 6.0.279225 guest; both also
+passed in the 5.18.270971 guest with
+`NM_TEST_UNSUPPORTED_FIRMWARE=1` for the firmware guard. The UI smoke check
+could not be completed: the available QEMU guests rendered a blank screen, so
+the KOReader/KFMon settings and refreshed screenshots remain unverified.
+
 ## Nickelite 1.1.1 screenshot check (2026-10-29)
 
 The Shortcuts, Menu items, and Permissions screenshots were recaptured on the

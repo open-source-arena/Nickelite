@@ -1,4 +1,4 @@
-# Nickelite 1.1.1
+# Nickelite 1.2.0
 
 Nickelite adds a configurable menu and a native Settings view to Kobo's Nickel reader software. It runs on the **Qt 6 based Kobo firmware 5+**. Firmware 4.x is outside this project's support scope.
 
@@ -59,7 +59,9 @@ The installer preserves existing `.adds/nm` files. Cloud services also require a
 
 The **Shortcuts** tab controls ready-made menu entries. **Menu items** edits entries across target menus and groups them by target. **Permissions** controls whether actions are available. The editor writes new items to `.adds/nm/zz-nm-settings.conf`, while existing entries remain in their source files. It validates hand edits and asks before discarding unsaved changes. The interface uses page turns for long lists to suit e-ink latency.
 
-To add KOReader, [install KOReader for Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices) under `.adds/koreader`, then turn on **KOReader** in Nickelite Settings → Shortcuts and apply. The shortcut runs KOReader's standard `/mnt/onboard/.adds/koreader/koreader.sh` launcher. Nickelite does not bundle KOReader. If your KOReader installer already added the same menu entry, the switch reflects that entry; avoid adding a second one.
+To add KOReader, [install KOReader for Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices) under `.adds/koreader`. When its executable launcher is present, Nickelite shows **KOReader** in Shortcuts and Permissions; enabling the shortcut adds the standard `/mnt/onboard/.adds/koreader/koreader.sh` launcher. The Menu items editor also offers a **Launch KOReader** preset. Both the KOReader and Commands permissions must be enabled for that launcher to run. Nickelite does not bundle KOReader. If your KOReader installer already added the same menu entry, the switch reflects that entry; avoid adding a second one.
+
+When KFMon is installed, its permission and related actions appear in Nickelite Settings. The Menu items editor offers a **List KFMon launchers** generator preset; it adds a normal menu item that lists configured KFMon watches. KFMon runs in the background and does not need a shortcut of its own.
 
 For hand editing, add a separate text file under `.adds/nm`; do not edit `.adds/nm/doc`. See [the config reference](res/doc). The Settings view is available on both tested firmware versions. The USB connection action is available for custom items but is deliberately absent from ready-made shortcuts because it changes the device's storage connection state.
 
@@ -75,7 +77,7 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
 ./scripts/package-release.sh
 ```
 
-The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.1.1`. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
+The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.2.0`. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
 
 ## Origins and license
 

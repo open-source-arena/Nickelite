@@ -2,7 +2,7 @@
 set -eu
 
 repo=open-source-arena/Nickelite
-version=1.1.1
+version=1.2.0
 mount=${1:?Usage: install.sh /path/to/KOBOeReader [versioned-package.zip]}
 [ -f "$mount/.kobo/version" ] || { echo 'Kobo storage is not mounted at that path.' >&2; exit 1; }
 firmware=$(cut -d, -f3 "$mount/.kobo/version" | tr -d '\r\n')
