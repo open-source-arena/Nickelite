@@ -1,10 +1,10 @@
-# Nickelite 1.4.0
+# Nickelite 1.5.0
 
 Nickelite adds a configurable menu and a native Settings view to Kobo's Nickel reader software. It runs on the **Qt 6 based Kobo firmware 5+**. Firmware 4.x is outside this project's support scope.
 
-The 1.4.0 QEMU screenshots below were captured from genuine Nickel 6.0.279225 in an isolated ARM userspace guest, with the 1.4.0 plugin, KOReader v2026.07.1 files, and the KFMon fork's 1.4.6 binary payload present. They show installed-app detection, Shortcuts, Permissions, and KFMon actions in Nickelite; they do not show KOReader runtime or KFMon daemon execution. QEMU has no Kobo framebuffer, so KFMon's FBInk daemon path is not runnable there. The legacy Menu, Menu items, and Permissions links below are older 1.1.1 captures. The KFMon picker photo is from a physical Clara BW running firmware 6.0.279225 and Nickelite 1.4.0.
+The 1.4.0 QEMU screenshots below were captured from genuine Nickel 6.0.279225 in an isolated ARM userspace guest, with the 1.4.0 plugin, KOReader v2026.07.1 files, and the KFMon fork's 1.4.6 binary payload present. They show installed-app detection, Shortcuts, Permissions, and KFMon actions in Nickelite; they do not show KOReader runtime or KFMon daemon execution. QEMU has no Kobo framebuffer, so KFMon's FBInk daemon path is not runnable there. The links explicitly labeled **Older** are 1.1.1 captures. The two physical Kobo screen photos below are cropped from user-provided Clara BW (N365) images captured on firmware 6.0.279225 with Nickelite 1.4.0. The crops remove the device body and background while preserving the screen content.
 
-[QEMU launchers](docs/screenshots/qemu-fw6-nickelite-launchers-1.4.0.jpg) · [QEMU Shortcuts](docs/screenshots/qemu-fw6-shortcuts-1.4.0.jpg) · [QEMU Permissions](docs/screenshots/qemu-fw6-permissions-1.4.0.jpg) · [QEMU KFMon Actions](docs/screenshots/qemu-fw6-kfmon-actions-1.4.0.jpg) · [Physical KFMon picker](docs/screenshots/kfmon-launcher-picker-1.4.0.jpg) · [Older Menu](docs/screenshots/main-menu.png) · [Older Menu items](docs/screenshots/settings-menu-items.png) · [Older Permissions](docs/screenshots/settings-permissions.png)
+[QEMU launchers](docs/screenshots/qemu-fw6-nickelite-launchers-1.4.0.jpg) · [QEMU Shortcuts](docs/screenshots/qemu-fw6-shortcuts-1.4.0.jpg) · [QEMU Permissions](docs/screenshots/qemu-fw6-permissions-1.4.0.jpg) · [QEMU KFMon Actions](docs/screenshots/qemu-fw6-kfmon-actions-1.4.0.jpg) · [Physical Shortcuts](docs/screenshots/settings-shortcuts-physical-1.4.0.jpg) · [Physical KFMon picker](docs/screenshots/kfmon-launcher-picker-physical-1.4.0.jpg) · [Older Menu](docs/screenshots/main-menu.png) · [Older Menu items](docs/screenshots/settings-menu-items.png) · [Older Permissions](docs/screenshots/settings-permissions.png)
 
 <p align="center"><a href="docs/screenshots/qemu-fw6-nickelite-launchers-1.4.0.jpg"><img src="docs/screenshots/qemu-fw6-nickelite-launchers-1.4.0.jpg" alt="Nickelite 1.4.0 main menu in a QEMU firmware 6 guest, showing the KOReader and KFMon launchers items" width="45%"></a> <a href="docs/screenshots/qemu-fw6-shortcuts-1.4.0.jpg"><img src="docs/screenshots/qemu-fw6-shortcuts-1.4.0.jpg" alt="Nickelite 1.4.0 Shortcuts in a QEMU firmware 6 guest, with KOReader and KFMon launchers enabled" width="45%"></a></p>
 <p align="center"><em>QEMU firmware 6.0.279225 UI captures; app detection and Nickelite UI only, not app or daemon runtime.</em></p>
@@ -12,10 +12,8 @@ The 1.4.0 QEMU screenshots below were captured from genuine Nickel 6.0.279225 in
 <p align="center"><a href="docs/screenshots/qemu-fw6-permissions-1.4.0.jpg"><img src="docs/screenshots/qemu-fw6-permissions-1.4.0.jpg" alt="Nickelite 1.4.0 QEMU Permissions showing KOReader and KFMon actions" width="45%"></a> <a href="docs/screenshots/qemu-fw6-kfmon-actions-1.4.0.jpg"><img src="docs/screenshots/qemu-fw6-kfmon-actions-1.4.0.jpg" alt="Nickelite 1.4.0 Action picker in QEMU showing KFMon file, entry, and launcher list choices" width="45%"></a></p>
 <p align="center"><em>QEMU firmware 6 Permissions and Action choices; app detection/editor UI only. The native launcher picker on a physical Clara BW (N365), firmware 6.0.279225, is shown separately below.</em></p>
 
-<p align="center"><a href="docs/screenshots/kfmon-launcher-picker-1.4.0.jpg"><img src="docs/screenshots/kfmon-launcher-picker-1.4.0.jpg" alt="Physical Clara BW KFMon launcher picker with Save device status selected" width="50%"></a></p>
-<p align="center"><em>Physical Clara BW (N365), firmware 6.0.279225, Nickelite 1.4.0.</em></p>
-
-<p align="center"><img src="docs/screenshots/settings-shortcuts.jpg" alt="Nickelite 1.2.0 Shortcuts on a physical Kobo Clara BW, with KOReader absent" width="50%"></p>
+<p align="center"><a href="docs/screenshots/settings-shortcuts-physical-1.4.0.jpg"><img src="docs/screenshots/settings-shortcuts-physical-1.4.0.jpg" alt="Shortcuts on a physical Clara BW, with KFMon installed and KOReader absent" width="45%"></a> <a href="docs/screenshots/kfmon-launcher-picker-physical-1.4.0.jpg"><img src="docs/screenshots/kfmon-launcher-picker-physical-1.4.0.jpg" alt="KFMon launcher picker on a physical Clara BW, with Save device status selected" width="45%"></a></p>
+<p align="center"><em>Screen-only physical photo crops from a Clara BW (N365), firmware 6.0.279225, Nickelite 1.4.0.</em></p>
 
 ## What it does
 
@@ -31,14 +29,14 @@ Kobo Clara BW (N365) does not normally show Dropbox or Google Drive in its More 
 
 | Firmware | Package | Evidence |
 | --- | --- | --- |
-| 5.18.270971 | `Nickelite-1.4.0-firmware-5.18.270971.zip` | Qt 6 cross-build, ARM compatibility, and OTA stage1 install/uninstall extraction checks passed in QEMU; the unsupported-firmware guard passed. The Settings UI and KFMon daemon framebuffer path could not be checked in QEMU. |
-| 6.0.279225 | `Nickelite-1.4.0-firmware-6.0.279225.zip` | Qt 6 cross-build and ARM compatibility checks passed in QEMU. On a physical Clara BW (N365), the reviewed 1.4.0 build opened Home and all Settings views responsively. The installed-only KFMon shortcut opened the native launcher list; Back and the My Books bottom tab both closed it without a crash. Selecting the sample **Save device status** watch showed KFMon's success notification and wrote the expected report under `.adds/kfmon`. Permissions showed **KFMon actions**, and Add Action offered List, File, and Entry. The Shortcuts toggle added one menu row and removing it removed that row. KFMon firmware 6 uninstall and rollback have not been physically tested. On that Clara BW running firmware 6.0.279225, KOReader v2026.07.1 launched and responded, but `Exit > Exit` froze on the boot animation and required a non-erasing power cycle. `Exit > Reboot device` returned to Nickel normally; use that exit option on this tested device. These results do not establish behavior on other firmware versions or Kobo models. |
+| 5.18.270971 | `Nickelite-1.5.0-firmware-5.18.270971.zip` | Qt 6 cross-build, ARM compatibility, and OTA stage1 install/uninstall extraction checks passed in QEMU; the unsupported-firmware guard passed. The Settings UI and KFMon daemon framebuffer path could not be checked in QEMU. |
+| 6.0.279225 | `Nickelite-1.5.0-firmware-6.0.279225.zip` | Qt 6 cross-build and ARM compatibility checks passed in QEMU. On a physical Clara BW (N365), Nickelite 1.4.0 passed Home/Settings, KFMon picker Back and My Books navigation, Save device status IPC, Permissions, Action choices, and Shortcuts add/remove checks. The 1.4.1 picker fix passed physical sleep/wake verification. KFMon firmware 6 uninstall and rollback have not been physically tested. The 1.5.0 tab override's short tap/hold was tested physically with a harmless toast action; a direct KOReader action also launched v2026.07.1 and `Exit > Reboot device` returned to responsive Nickel. `Exit > Exit` froze on the boot animation during an earlier test and required a non-erasing power cycle; use the reboot option on this device. The tab can remain visually selected after using the override. These results do not establish behavior on other firmware versions or Kobo models. |
 
-These are the **pinned firmware builds** for the 1.4.0 downloads. Other firmware 5.x/6.x builds and Kobo models need separate compatibility checks. The only physical model tested so far is **Kobo Clara BW**. The simulator runs genuine Nickel in QEMU userspace; it does not emulate Kobo hardware. See the [compatibility matrix](docs/feature-matrix.md), [6.0 results](docs/firmware-6.0.279225.md), and [simulator guide](docs/emulator/real-cloud.md).
+These are the **pinned firmware builds** for the 1.5.0 downloads. Other firmware 5.x/6.x builds and Kobo models need separate compatibility checks. The only physical model tested so far is **Kobo Clara BW**. The simulator runs genuine Nickel in QEMU userspace; it does not emulate Kobo hardware. See the [compatibility matrix](docs/feature-matrix.md), [6.0 results](docs/firmware-6.0.279225.md), and [simulator guide](docs/emulator/real-cloud.md).
 
 ## Download and install
 
-Download the matching versioned ZIP and `SHA256SUMS` from the [public v1.4.0 release](https://github.com/open-source-arena/Nickelite/releases/tag/v1.4.0). Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
+Download the matching versioned ZIP and `SHA256SUMS` from the [public v1.5.0 release](https://github.com/open-source-arena/Nickelite/releases/tag/v1.5.0). Each ZIP contains `.kobo/Kobo.tgz`'s payload as `Kobo.tgz`, an internal checksum manifest, and, for 6.0.279225, an optional cloud shortcut config.
 
 **Automated install:** connect the Kobo by USB, tap **Connect**, and find its mounted storage path. Install [GitHub CLI](https://cli.github.com/) to download the release automatically; sign-in is not required for this public repository. Run one of these commands from a clone of this repository:
 
@@ -104,6 +102,23 @@ If the watch is removed or its filename changes, `kfmon` reports an invalid file
 
 **List KFMon launchers** is terminal in an action chain: after it opens, later actions in that chain are skipped, whether the picker is closed or a watch is selected.
 
+### Run an action from the bottom tab
+
+To make a short tap on the Nickelite bottom tab run one action (for example, KOReader), create `.adds/nickelite/tab.ini`:
+
+```ini
+action=cmd_spawn
+argument=quiet:exec /mnt/onboard/.adds/koreader/koreader.sh
+label=KOReader
+```
+
+`action` must be one supported Nickelite action name, `argument` is required and uses that action's normal argument syntax, and `label` is optional (maximum 32 characters). This file accepts one action only; it does not take `menu_item:` syntax or a chain. Short tap runs the action, and a press-and-hold opens the regular Nickelite menu. The configured tab label stays visible while the menu or a Nickelite view is open. The tab action runs independently of the Settings permission switches. If KOReader's launcher is missing, Nickelite opens its menu instead. If the file is missing or invalid, tapping the tab keeps the standard menu behavior. To restore that behavior at any time, remove or rename `tab.ini`; USB access is enough for recovery.
+
+<p align="center"><a href="docs/screenshots/qemu-fw6-tab-override-idle-1.5.0.jpg"><img src="docs/screenshots/qemu-fw6-tab-override-idle-1.5.0.jpg" alt="Firmware 6 QEMU Home with the configured KOReader bottom tab label" width="45%"></a> <a href="docs/screenshots/qemu-fw6-tab-override-long-press-1.5.0.jpg"><img src="docs/screenshots/qemu-fw6-tab-override-long-press-1.5.0.jpg" alt="Firmware 6 QEMU NickelMenu opened by holding the KOReader bottom tab, whose label remains configured" width="45%"></a></p>
+<p align="center"><em>Genuine Nickel 6.0.279225 QEMU guest with an official KOReader package present. These captures show Nickelite label/menu behavior only; KOReader was not launched in the guest.</em></p>
+
+See the [bottom tab action guide](docs/tab-override.md) for supported actions, recovery, and screenshots.
+
 For hand editing, add a separate text file under `.adds/nm`; do not edit `.adds/nm/doc`. See [the config reference](res/doc). The Settings view is available on both tested firmware versions. The USB connection action is available for custom items but is deliberately absent from ready-made shortcuts because it changes the device's storage connection state.
 
 ## Build and simulator
@@ -118,7 +133,7 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
 ./scripts/package-release.sh
 ```
 
-The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.4.0` and includes the optional KFMon release assets. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
+The SDK build downloads Qt source and takes substantial time and disk space. The local `Kobo.tgz` is the production package; `scripts/package-release.sh` assembles versioned ZIPs in `dist/1.5.0` and includes the optional KFMon release assets. The [simulator setup](docs/emulator/real-cloud.md) records firmware download, checksum verification, QEMU, VNC, network access, and optional cloud linking. Firmware, cloud tokens, and account data stay outside Git.
 
 ## Origins and license
 

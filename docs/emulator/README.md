@@ -359,3 +359,21 @@ repeat-open panic/restart. The emulator did not test service listing, login,
 downloads or sync. The later real-network guest results are in
 [real-cloud.md](real-cloud.md). See
 [the compatibility report](../action-compatibility-6.md) for the current status.
+
+## Nickelite 1.5.0 bottom-tab override
+
+The following two screenshots are direct captures from the genuine Nickel
+6.0.279225 QEMU ARM userspace guest. It used the 1.5.0 `libnm.so`, an official
+KOReader package on synthetic onboard storage, and `.adds/nickelite/tab.ini`
+with the standard KOReader launcher and `label=KOReader`. VNC mouse input
+confirmed that a short tap runs a disposable diagnostic action once and a 1.2
+second hold opens the regular Nickelite menu without running the action on
+release. A `test/qt_compat` regression assertion verifies that the explicit
+tab action bypasses the Commands permission switch. KOReader itself was not
+launched in this guest.
+
+<p align="center"><a href="../screenshots/qemu-fw6-tab-override-idle-1.5.0.jpg"><img src="../screenshots/qemu-fw6-tab-override-idle-1.5.0.jpg" alt="Firmware 6 QEMU Home showing a custom KOReader tab label" width="45%"></a> <a href="../screenshots/qemu-fw6-tab-override-long-press-1.5.0.jpg"><img src="../screenshots/qemu-fw6-tab-override-long-press-1.5.0.jpg" alt="Firmware 6 QEMU Nickelite menu opened by holding the custom KOReader tab" width="45%"></a></p>
+
+These images show Nickelite's UI and gesture routing, not KOReader runtime
+compatibility or firmware 5 behavior. The guest uses synthetic storage and
+does not emulate Kobo hardware.

@@ -3,8 +3,11 @@
 #include "../src/util.h"
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QCoreApplication>
+#include <QApplication>
+#include <QEventLoop>
+#include <QMouseEvent>
 #include <QTemporaryFile>
+#include <QTimer>
 #include <cassert>
 #include <cstring>
 
@@ -21,6 +24,9 @@ static bool original_gdrive_support;
 static bool test_model_support(const void *device) { return device == n365_device; }
 static bool test_original_dropbox_support(const void *) { return original_dropbox_support; }
 static bool test_original_gdrive_support(const void *) { return original_gdrive_support; }
+#if NM_QT_MAJOR >= 6
+static bool test_feature_disabled(const char *) { return false; }
+#endif
 static MainNavView *original_constructor(MainNavView *view, QWidget *parent) {
     assert(view == expected_view && parent == expected_parent);
     ++constructor_calls;
@@ -28,7 +34,9 @@ static MainNavView *original_constructor(MainNavView *view, QWidget *parent) {
 }
 
 int main(int argc, char **argv) {
-    QCoreApplication app(argc, argv);
+    qputenv("QT_QPA_PLATFORM", "offscreen");
+    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "/usr/lib/plugins/platforms");
+    QApplication app(argc, argv);
     unsigned child_creations = 0;
     bool type_mismatch = false;
     const QString child_name = QStringLiteral("nmTestController");
@@ -44,7 +52,69 @@ int main(int argc, char **argv) {
     assert(type_mismatch && child_creations == 2);
     delete replacement;
 
+    auto tabOverride = nm_parse_tab_override("action=cmd_spawn\nargument=quiet:exec /mnt/onboard/.adds/koreader/koreader.sh\nlabel=KOReader\n");
+    assert(tabOverride && tabOverride->action.act == NM_ACTION(cmd_spawn));
+    assert(tabOverride->action.arg == tabOverride->argument.data());
+    assert(tabOverride->displayLabel == QLatin1String("KOReader"));
+    auto noLabelOverride = nm_parse_tab_override("# default label\naction=kfmon_list\nargument=\n");
+    assert(noLabelOverride && noLabelOverride->action.act == NM_ACTION(kfmon_list));
+    assert(noLabelOverride->displayLabel.isEmpty());
+    assert(!nm_parse_tab_override("action=cmd_spawn\naction=cmd_spawn\nargument=x\n"));
+    assert(!nm_parse_tab_override("action=not_an_action\nargument=x\n"));
+    assert(!nm_parse_tab_override("action=skip\nargument=1\n"));
+    assert(!nm_parse_tab_override("action=cmd_spawn\n"));
+    assert(!nm_parse_tab_override("unknown=x\naction=cmd_spawn\nargument=x\n"));
+    QByteArray nulArgument("action=dbg_toast\nargument=x");
+    nulArgument.append('\0');
+    nulArgument += "y\n";
+    assert(!nm_parse_tab_override(nulArgument));
+
 #if NM_QT_MAJOR >= 6
+    QWidget tabButton;
+    int tapCalls = 0;
+    int longPressCalls = 0;
+    NmMainTabGesture tabGesture(&tabButton, [&tapCalls] { ++tapCalls; }, [&longPressCalls] { ++longPressCalls; }, 40);
+    tabButton.show();
+    QMouseEvent tapPress(QEvent::MouseButtonPress, QPointF(10, 10), QPointF(10, 10), QPointF(10, 10),
+                         Qt::LeftButton, Qt::LeftButton, Qt::NoModifier, Qt::MouseEventNotSynthesized);
+    QMouseEvent tapRelease(QEvent::MouseButtonRelease, QPointF(10, 10), QPointF(10, 10), QPointF(10, 10),
+                           Qt::LeftButton, Qt::NoButton, Qt::NoModifier, Qt::MouseEventNotSynthesized);
+    QApplication::sendEvent(&tabButton, &tapPress);
+    QApplication::sendEvent(&tabButton, &tapRelease);
+    tabGesture.handleTap();
+    assert(tapCalls == 1 && longPressCalls == 0);
+
+    QMouseEvent holdPress(QEvent::MouseButtonPress, QPointF(10, 10), QPointF(10, 10), QPointF(10, 10),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier, Qt::MouseEventNotSynthesized);
+    QApplication::sendEvent(&tabButton, &holdPress);
+    QEventLoop holdLoop;
+    QTimer::singleShot(60, &holdLoop, &QEventLoop::quit);
+    holdLoop.exec();
+    assert(longPressCalls == 1);
+    QMouseEvent holdRelease(QEvent::MouseButtonRelease, QPointF(10, 10), QPointF(10, 10), QPointF(10, 10),
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier, Qt::MouseEventNotSynthesized);
+    QApplication::sendEvent(&tabButton, &holdRelease);
+    tabGesture.handleTap();
+    assert(tapCalls == 1 && longPressCalls == 1);
+
+    QMouseEvent movePress(QEvent::MouseButtonPress, QPointF(10, 10), QPointF(10, 10), QPointF(10, 10),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier, Qt::MouseEventNotSynthesized);
+    QApplication::sendEvent(&tabButton, &movePress);
+    QMouseEvent move(QEvent::MouseMove, QPointF(50, 10), QPointF(50, 10), QPointF(50, 10),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier, Qt::MouseEventNotSynthesized);
+    QApplication::sendEvent(&tabButton, &move);
+    QEventLoop movedLoop;
+    QTimer::singleShot(60, &movedLoop, &QEventLoop::quit);
+    movedLoop.exec();
+    assert(longPressCalls == 1);
+
+    const auto malformedOverride = nm_parse_tab_override("action=missing\nargument=x\n");
+    assert(!malformedOverride);
+    int fallbackMenuCalls = 0;
+    NmMainTabGesture fallbackGesture(&tabButton, [&fallbackMenuCalls] { ++fallbackMenuCalls; }, [] {}, 40);
+    fallbackGesture.handleTap();
+    assert(fallbackMenuCalls == 1);
+
     nm_err_set(nullptr);
     assert(!nm_config_parse(nullptr) && !nm_err_peek());
     size_t emptyCount = 1;
@@ -59,6 +129,14 @@ int main(int argc, char **argv) {
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_setting), "enable:screenshots"), "screenshots"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_misc), "force_usb_connection"), "usb"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(nickel_misc), "rescan_books"), "book_scan"));
+#if NM_QT_MAJOR >= 6
+    char tabActionArg[] = "quiet:exec /mnt/onboard/.adds/koreader/koreader.sh";
+    nm_menu_action_t tabAction = {tabActionArg, true, false, NM_ACTION(cmd_spawn), nullptr};
+    const char *blockedFeature = nullptr;
+    assert(nm_action_permission_blocked(&tabAction, false, test_feature_disabled, &blockedFeature));
+    assert(!std::strcmp(blockedFeature, "commands"));
+    assert(!nm_action_permission_blocked(&tabAction, true, test_feature_disabled, &blockedFeature));
+#endif
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(kfmon), "watch.png"), "kfmon"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(kfmon_id), "watch-id"), "kfmon"));
     assert(!std::strcmp(nm_feature_for_action(NM_ACTION(kfmon_list), ""), "kfmon"));
@@ -76,6 +154,67 @@ int main(int argc, char **argv) {
     assert(nm_action_available("dbg_msg", false));
     assert(!nm_feature_for_action(NM_ACTION(uninstall), ""));
     assert(!nm_feature_for_action(NM_ACTION(skip), "1"));
+
+    const QRect systemViewArea(0, 0, 1000, 1400);
+    assert(nm_system_view_covers(QRect(0, 0, 800, 1120), systemViewArea));
+    assert(!nm_system_view_covers(QRect(0, 0, 1000, 1000), systemViewArea));
+    assert(nm_system_transition_event(QEvent::ApplicationDeactivate));
+    assert(nm_system_transition_event(QEvent::ApplicationStateChange));
+    assert(!nm_system_transition_event(QEvent::Show));
+    assert(nm_system_view_presented_event(QEvent::Show, false));
+    assert(nm_system_view_presented_event(QEvent::ShowToParent, false));
+    assert(nm_system_view_presented_event(QEvent::WindowActivate, true));
+    assert(!nm_system_view_presented_event(QEvent::WindowActivate, false));
+    assert(!nm_system_view_presented_event(QEvent::Hide, true));
+    QWidget picker;
+    picker.setGeometry(0, 0, 1000, 1400);
+    new NmSystemDialogGuard(&picker, true, false);
+    picker.show();
+    app.processEvents();
+    assert(picker.isVisible());
+    QWidget systemView;
+    systemView.setGeometry(0, 0, 1000, 1400);
+    systemView.show();
+    assert(!picker.isVisible());
+    app.processEvents();
+    assert(!picker.isVisible());
+    QEventLoop closeLoop;
+    QTimer::singleShot(50, &closeLoop, &QEventLoop::quit);
+    closeLoop.exec();
+    assert(!picker.isVisible());
+    systemView.close();
+    QTimer transitionSignal;
+    transitionSignal.setSingleShot(true);
+    transitionSignal.setInterval(0);
+    QEventLoop transitionLoop;
+    bool transitionDismissed = false;
+    assert(nm_connect_transition_signal(&transitionSignal, SIGNAL(timeout()), &transitionLoop, SLOT(quit())));
+    transitionSignal.start();
+    transitionLoop.exec();
+    transitionDismissed = !transitionSignal.isActive();
+    assert(transitionDismissed);
+
+    QWidget lifecyclePicker;
+    lifecyclePicker.setGeometry(0, 0, 1000, 1400);
+    lifecyclePicker.show();
+    app.processEvents();
+    assert(lifecyclePicker.isVisible());
+    QTimer lifecycleSignal;
+    lifecycleSignal.setSingleShot(true);
+    lifecycleSignal.setInterval(0);
+    QTimer closeTimer;
+    closeTimer.setSingleShot(true);
+    closeTimer.setInterval(0);
+    assert(nm_connect_transition_signal(&lifecycleSignal, SIGNAL(timeout()), &lifecyclePicker, SLOT(hide())));
+    assert(nm_connect_transition_signal(&lifecycleSignal, SIGNAL(timeout()), &closeTimer, SLOT(start())));
+    QObject::connect(&closeTimer, &QTimer::timeout, &lifecyclePicker, [&lifecyclePicker] {
+        nm_queue_native_close(&lifecyclePicker);
+    });
+    lifecycleSignal.start();
+    QEventLoop lifecycleLoop;
+    QTimer::singleShot(50, &lifecycleLoop, &QEventLoop::quit);
+    lifecycleLoop.exec();
+    assert(!lifecyclePicker.isVisible());
 
     bool foundKfmonPermission = false;
     for (const auto &feature : nm_features)

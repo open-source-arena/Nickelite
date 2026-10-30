@@ -10,7 +10,7 @@ if ($KFMon) {
     else { & $installer -KoboDrive $KoboDrive }
     return
 }
-$version = '1.4.0'
+$version = '1.5.0'
 $root = (Resolve-Path $KoboDrive).Path
 $versionFile = Join-Path $root '.kobo/version'
 if (-not (Test-Path $versionFile)) { throw 'Kobo storage is not mounted at that path.' }

@@ -1,5 +1,5 @@
 NH_QT_MAJOR ?= 6
-VERSION := 1.4.0
+VERSION := 1.5.0
 NICKELHOOK ?= NickelHook/
 include $(patsubst %/,%,$(NICKELHOOK))/NickelHook.mk
 

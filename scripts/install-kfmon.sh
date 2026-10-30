@@ -2,7 +2,7 @@
 set -eu
 
 repo=open-source-arena/Nickelite
-version=1.4.0
+version=1.5.0
 asset=KFMon-Nickelite-Install.zip
 mount=${1:?Usage: install.sh --kfmon /path/to/KOBOeReader [install-package.zip]}
 package=${2:-}

@@ -1,4 +1,4 @@
-# Upstream NickelMenu v0.6.0 compared with Nickelite 1.4.0 on Kobo 5+
+# Upstream NickelMenu v0.6.0 compared with Nickelite 1.5.0 on Kobo 5+
 
 This inventory uses the upstream [v0.6.0 documentation](https://github.com/pgaskin/NickelMenu/tree/v0.6.0), its tagged `Makefile` and source, plus this branch's action registry and the [physical compatibility report](firmware-6.0.279225.md). “Implemented” means the action exists and checks its runtime dependencies; it does not mean every subaction was tested on the N365. The physical results below apply to Clara BW (N365) on 6.0.279225.
 
@@ -27,6 +27,7 @@ for a full-rootfs replacement.
 | Older v0.6.0 feature | Nickelite on 6.0.279225 | How to enable or limit it |
 |---|---|---|
 | Main menu tab; reader, browser, library, selection, and selection-search menus | Implemented; main tab physically verified. Other menu locations retain their hooks but need a physical check on this firmware. | Add `menu_item` entries in `.adds/nm`; main tab is automatic. |
+| Bottom tab direct action override | Optional `.adds/nickelite/tab.ini` runs one action on short tap; press-and-hold opens the regular Nickelite menu. QEMU firmware 6 VNC input showed a diagnostic action running once and held menu open without running the action on release. On physical Clara BW (N365) firmware 6.0.279225, a direct KOReader v2026.07.1 launch worked; `Exit > Reboot device` returned to responsive Nickel. The tab may remain visually selected after the action. Other firmware/models remain unverified. | Set `action`, `argument`, and optional `label` in `.adds/nickelite/tab.ini`. The direct tab action bypasses Settings permission switches. Remove or rename the file to restore standard tab behavior. |
 | Menu labels, ordering, separators, custom tab label/icons, and stock-tab visibility | Implemented from existing config and `experimental` options. | Configure in `.adds/nm`; some options need a reboot. |
 | Action chains: success, failure, always, and `skip` | Implemented; disabled features fail normally so `chain_failure` can run. | Configure chains; `skip` stays available for recovery. |
 | Selection substitution and transforms | Implemented, including the corrected `u` and `x` flags. | Use selection menu entries. |

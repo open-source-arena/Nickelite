@@ -1,11 +1,13 @@
 #include <QAction>
 #include <QApplication>
+#include <QDateTime>
 #if NM_QT_MAJOR >= 6
 #include <QByteArrayView>
 #endif
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QFile>
+#include <QFileInfo>
 #include <QLayout>
 #include <QMenu>
 #include <QMetaProperty>
@@ -15,6 +17,13 @@
 #include <QUrl>
 #include <QWidget>
 #include <QWidgetAction>
+#include <QPointer>
+#include <QSet>
+#include <QTimer>
+#include <QTouchEvent>
+#include <QMouseEvent>
+#include <QGestureEvent>
+#include <QTapAndHoldGesture>
 #if NM_QT_MAJOR >= 6
 #include <QCheckBox>
 #include <QColor>
@@ -22,7 +31,6 @@
 #include <QDialog>
 #include <QDir>
 #include <QEvent>
-#include <QFileInfo>
 #include <QFrame>
 #include <QFormLayout>
 #include <QGraphicsOpacityEffect>
@@ -34,7 +42,6 @@
 #include <QMap>
 #include <QMessageBox>
 #include <QMouseEvent>
-#include <QPointer>
 #include <QPair>
 #include <QSaveFile>
 #include <QScreen>
@@ -44,8 +51,6 @@
 #include <QSettings>
 #include <QTabWidget>
 #include <QTabBar>
-#include <QTimer>
-#include <QTouchEvent>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 #endif
@@ -56,6 +61,7 @@
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <string>
 
 #include <NickelHook.h>
 #include "native.h"
@@ -65,6 +71,104 @@
 #include "config.h"
 #include "nickelmenu.h"
 #include "util.h"
+
+struct nm_tab_override {
+    nm_menu_item_t item{};
+    nm_menu_action_t action{};
+    std::string label;
+    std::string argument;
+    QString displayLabel;
+};
+
+static std::unique_ptr<nm_tab_override> nm_configured_tab_override;
+
+static nm_action_fn_t nm_tab_action_from_name(const QByteArray &name) {
+#define X(actionName, qt5, qt6) \
+    if (name == QByteArray(#actionName) && NM_ACTION_SUPPORTED(qt5, qt6)) return NM_ACTION(actionName);
+    NM_ACTIONS
+#undef X
+    return nullptr;
+}
+
+static std::unique_ptr<nm_tab_override> nm_parse_tab_override(const QByteArray &contents) {
+    if (contents.size() > 4096 || contents.contains('\0')) {
+        NM_LOG("Ignoring invalid, oversized, or binary bottom-tab override");
+        return nullptr;
+    }
+
+    QByteArray actionName, argument, label;
+    bool haveAction = false, haveArgument = false, haveLabel = false;
+    for (QByteArray line : contents.split('\n')) {
+        line = line.trimmed();
+        if (line.isEmpty() || line.startsWith('#') || line.startsWith(';')) continue;
+        const int equals = line.indexOf('=');
+        if (equals <= 0) {
+            NM_LOG("Ignoring malformed bottom-tab override line");
+            return nullptr;
+        }
+        const QByteArray key = line.left(equals).trimmed();
+        const QByteArray value = line.mid(equals + 1).trimmed();
+        if (key == "action" && !haveAction) { actionName = value; haveAction = true; }
+        else if (key == "argument" && !haveArgument) { argument = value; haveArgument = true; }
+        else if (key == "label" && !haveLabel) { label = value; haveLabel = true; }
+        else {
+            NM_LOG("Ignoring bottom-tab override with unknown or duplicate key");
+            return nullptr;
+        }
+    }
+    if (!haveAction || !haveArgument || actionName.isEmpty() || actionName.size() > 32
+        || argument.size() > 2048 || label.size() > 128) {
+        NM_LOG("Ignoring incomplete or oversized bottom-tab override");
+        return nullptr;
+    }
+    const QString decodedLabel = QString::fromUtf8(label.constData(), label.size());
+    const QString decodedArgument = QString::fromUtf8(argument.constData(), argument.size());
+    if ((haveLabel && (decodedLabel.isEmpty() || decodedLabel.size() > 32
+            || decodedLabel.toUtf8() != label)) || decodedArgument.toUtf8() != argument) {
+        NM_LOG("Ignoring bottom-tab override with invalid UTF-8 or label");
+        return nullptr;
+    }
+    nm_action_fn_t action = nm_tab_action_from_name(actionName);
+    if (!action || actionName == "skip") {
+        NM_LOG("Ignoring bottom-tab override with unsupported action");
+        return nullptr;
+    }
+
+    std::unique_ptr<nm_tab_override> result(new nm_tab_override);
+    result->label = label.isEmpty() ? "Nickelite" : std::string(label.constData(), static_cast<size_t>(label.size()));
+    result->argument = std::string(argument.constData(), static_cast<size_t>(argument.size()));
+    result->displayLabel = haveLabel ? decodedLabel : QString();
+    result->item.loc = NM_MENU_LOCATION(main);
+    result->item.lbl = const_cast<char *>(result->label.c_str());
+    result->item.action = &result->action;
+    result->action.arg = const_cast<char *>(result->argument.c_str());
+    result->action.on_success = true;
+    result->action.on_failure = true;
+    result->action.act = action;
+    result->action.next = nullptr;
+    return result;
+}
+
+static std::unique_ptr<nm_tab_override> nm_read_tab_override() {
+    const QString path = QLatin1String("/mnt/onboard/.adds/nickelite/tab.ini");
+    if (!QFileInfo::exists(path)) return nullptr;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        NM_LOG("Cannot read bottom-tab override %s", qPrintable(path));
+        return nullptr;
+    }
+    const QByteArray contents = file.read(4097);
+    if (file.error() != QFileDevice::NoError) {
+        NM_LOG("Ignoring unreadable bottom-tab override");
+        return nullptr;
+    }
+    return nm_parse_tab_override(contents);
+}
+
+static bool nm_koreader_available() {
+    const QFileInfo marker(QLatin1String("/mnt/onboard/.adds/koreader/koreader.sh"));
+    return marker.isFile() && marker.isExecutable();
+}
 
 #if NM_QT_MAJOR >= 6
 static void nm_show_dialog(QString const &title, QString const &body);
@@ -112,11 +216,6 @@ static constexpr nm_shortcut nm_shortcuts[] = {
     {"Restart", "power", "reboot", "power"},
     {"Power off", "power", "shutdown", "power"},
 };
-
-static bool nm_koreader_available() {
-    const QFileInfo marker(QLatin1String("/mnt/onboard/.adds/koreader/koreader.sh"));
-    return marker.isFile() && marker.isExecutable();
-}
 
 static bool nm_kfmon_available() {
     const QFileInfo marker(QLatin1String("/usr/local/kfmon/bin/kfmon"));
@@ -190,6 +289,13 @@ static bool nm_item_permissions_enabled(const nm_menu_item_t *item) {
         if (nm_action_is_koreader(action->act, action->arg) && !nm_feature_enabled("koreader")) return false;
     }
     return true;
+}
+
+static bool nm_action_permission_blocked(const nm_menu_action_t *action, bool bypassPermissions,
+                                         bool (*featureEnabled)(const char *), const char **featureOut) {
+    const char *feature = action ? nm_feature_for_action(action->act, action->arg) : nullptr;
+    if (featureOut) *featureOut = feature;
+    return !bypassPermissions && feature && !featureEnabled(feature);
 }
 
 static void nm_set_menu_widget_enabled(QWidget *widget, bool enabled) {
@@ -398,24 +504,65 @@ private:
     bool confirming = false;
 };
 
+static bool nm_system_view_covers(const QRect &candidate, const QRect &view) {
+    const QRect overlap = candidate.intersected(view);
+    return !view.isEmpty() && overlap.width() >= view.width() * 4 / 5
+        && overlap.height() >= view.height() * 4 / 5;
+}
+
+static bool nm_system_transition_event(QEvent::Type type) {
+    return type == QEvent::ApplicationDeactivate || type == QEvent::ApplicationStateChange;
+}
+
+static bool nm_system_view_presented_event(QEvent::Type type, bool visible) {
+    return type == QEvent::Show || type == QEvent::ShowToParent
+        || (visible && (type == QEvent::Resize || type == QEvent::ZOrderChange || type == QEvent::WindowActivate));
+}
+
+static bool nm_connect_transition_signal(QObject *source, const char *signal, QObject *context,
+                                         const char *slot) {
+    if (!source || !signal || !context || !slot) return false;
+    return bool(QObject::connect(source, signal, context, slot, Qt::DirectConnection));
+}
+
+static bool nm_queue_native_close(QWidget *view);
+
 class NmSystemDialogGuard final : public QObject {
 public:
-    explicit NmSystemDialogGuard(QWidget *view) : QObject(view), view(view) {
+    explicit NmSystemDialogGuard(QWidget *view, bool dismissOnSystemView = false,
+                                 bool watchLifecycleTransitions = true)
+        : QObject(view), view(view), dismissOnSystemView(dismissOnSystemView),
+          watchLifecycleTransitions(watchLifecycleTransitions) {
         qApp->installEventFilter(this);
+        if (dismissOnSystemView && watchLifecycleTransitions) connectPowerTransitions();
     }
 protected:
     bool eventFilter(QObject *object, QEvent *event) override {
+        if (dismissOnSystemView && watchLifecycleTransitions && object == qApp
+            && nm_system_transition_event(event->type())) {
+            if (view) view->hide();
+            nm_queue_native_close(view);
+            return false;
+        }
         auto *widget = qobject_cast<QWidget *>(object);
         if (!widget || widget == view || view->isAncestorOf(widget)) return false;
         const QRect viewArea(view->mapToGlobal(QPoint(0, 0)), view->size());
         const QRect widgetArea(widget->mapToGlobal(QPoint(0, 0)), widget->size());
-        const bool coversView = widgetArea.intersected(viewArea).width() >= viewArea.width() * 4 / 5
-            && widgetArea.intersected(viewArea).height() >= viewArea.height() * 4 / 5;
+        const bool coversView = nm_system_view_covers(widgetArea, viewArea);
         if (!widget->isWindow() && !widget->isModal() && !coversView) return false;
         const Qt::WindowType type = widget->windowType();
-        if (type == Qt::Popup || type == Qt::ToolTip || type == Qt::Tool || widget->inherits("MainWindow")) return false;
-        if ((event->type() == QEvent::Show || (event->type() == QEvent::Resize && widget->isVisible()))
-            && !dialogs.contains(widget)) {
+        if (type == Qt::Popup || type == Qt::ToolTip || type == Qt::Tool) return false;
+        const bool nickelMainWindow = widget->inherits("MainWindow");
+        if (nickelMainWindow && !dismissOnSystemView) return false;
+        const bool viewPresented = nm_system_view_presented_event(event->type(), widget->isVisible());
+        if (viewPresented && !dialogs.contains(widget)) {
+            if (dismissOnSystemView) {
+                // Nickel reuses its main window while pushing system pages. Such
+                // transitions may not create a new modal QWidget to observe.
+                view->hide();
+                nm_queue_native_close(view);
+                return false;
+            }
             dialogs.insert(widget);
             QObject::connect(widget, &QObject::destroyed, this, [this, widget] { resume(widget); });
             view->hide();
@@ -425,11 +572,40 @@ protected:
         return false;
     }
 private:
+    void connectPowerTransitions() {
+        auto *closeTimer = new QTimer(view);
+        closeTimer->setSingleShot(true);
+        closeTimer->setInterval(0);
+        QObject::connect(closeTimer, &QTimer::timeout, view, [view = view] {
+            if (view && !view->property("nmCloseQueued").toBool()) nm_queue_native_close(view);
+        });
+        const bool appState = nm_connect_transition_signal(qApp,
+            SIGNAL(applicationStateChanged(Qt::ApplicationState)), view, SLOT(hide()))
+            && nm_connect_transition_signal(qApp,
+                SIGNAL(applicationStateChanged(Qt::ApplicationState)), closeTimer, SLOT(start()));
+        auto sharedInstance = reinterpret_cast<QObject *(*)()>(
+            dlsym(RTLD_DEFAULT, "_ZN22N3PowerWorkflowManager14sharedInstanceEv"));
+        QObject *power = sharedInstance ? sharedInstance() : nullptr;
+        if (!power) {
+            NM_LOG("Picker transition guards: sleep=0 powerOff=0 reboot=0 appState=%d", appState);
+            return;
+        }
+        const bool sleep = nm_connect_transition_signal(power, SIGNAL(aboutToSleep()), view, SLOT(hide()))
+            && nm_connect_transition_signal(power, SIGNAL(aboutToSleep()), closeTimer, SLOT(start()));
+        const bool powerOff = nm_connect_transition_signal(power, SIGNAL(aboutToPowerOff()), view, SLOT(hide()))
+            && nm_connect_transition_signal(power, SIGNAL(aboutToPowerOff()), closeTimer, SLOT(start()));
+        const bool reboot = nm_connect_transition_signal(power, SIGNAL(aboutToReboot()), view, SLOT(hide()))
+            && nm_connect_transition_signal(power, SIGNAL(aboutToReboot()), closeTimer, SLOT(start()));
+        NM_LOG("Picker transition guards: sleep=%d powerOff=%d reboot=%d appState=%d",
+               sleep, powerOff, reboot, appState);
+    }
     void resume(QWidget *widget) {
         if (dialogs.remove(widget) && dialogs.isEmpty() && view) view->show();
     }
     QPointer<QWidget> view;
     QSet<QWidget *> dialogs;
+    bool dismissOnSystemView = false;
+    bool watchLifecycleTransitions = true;
 };
 
 static bool nm_queue_native_close(QWidget *view) {
@@ -767,6 +943,7 @@ static void nm_show_kfmon_picker(const QString &title, const nm_action_result_t 
         nm_show_dialog(title, QStringLiteral("Kobo's native launcher list is unavailable on this firmware."));
         return;
     }
+    new NmSystemDialogGuard(view, true);
 
     QStringList watchFiles;
     for (size_t i = 0; i < result->list_count; ++i)
@@ -1763,7 +1940,8 @@ typedef char *(*nm_argtransform_t)(void *data, const char *arg);
 
 // nm_menu_item_do runs a nm_menu_item_t and must be called from the thread of a
 // signal handler. argtransform and argtransform_data are optional.
-static void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *argtransform_data);
+static void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *argtransform_data,
+                            bool bypassPermissions = false);
 
 // _nm_menu_inject handles the QMenu::aboutToShow signal and injects menu items.
 static void _nm_menu_inject(void *nmc, QMenu *menu, nm_menu_location_t loc, int at);
@@ -1892,6 +2070,127 @@ static bool nm_write_default_icon(const char *path, int resourceIndex) {
     return !icon.isNull() && icon.save(QString::fromLatin1(path), "PNG");
 }
 
+static QPoint nm_main_tab_mouse_position(const QMouseEvent *event) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    return event->globalPosition().toPoint();
+#else
+    return event->globalPos();
+#endif
+}
+
+static QPoint nm_main_tab_touch_position(const QTouchEvent *event) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    return event->points().isEmpty() ? QPoint() : event->points().first().globalPosition().toPoint();
+#else
+    return event->touchPoints().isEmpty() ? QPoint() : event->touchPoints().first().screenPos().toPoint();
+#endif
+}
+
+class NmMainTabGesture final : public QObject {
+public:
+    NmMainTabGesture(QWidget *button, std::function<void()> tap, std::function<void()> longPress, int threshold = 900)
+        : QObject(button), button(button), tap(std::move(tap)), longPress(std::move(longPress)) {
+        timer.setSingleShot(true);
+        timer.setInterval(threshold);
+        QObject::connect(&timer, &QTimer::timeout, this, [this] { triggerLongPress(); });
+        if (this->longPress) {
+            button->grabGesture(Qt::TapAndHoldGesture);
+            button->installEventFilter(this);
+        }
+    }
+
+    bool consumeTap() {
+        if (!longConsumed) return false;
+        longConsumed = false;
+        return true;
+    }
+
+    void handleTap() {
+        if (consumeTap()) return;
+        if (tap) tap();
+    }
+
+protected:
+    bool eventFilter(QObject *, QEvent *event) override {
+        switch (event->type()) {
+        case QEvent::Gesture: {
+            auto *gestureEvent = static_cast<QGestureEvent *>(event);
+            auto *hold = qobject_cast<QTapAndHoldGesture *>(gestureEvent->gesture(Qt::TapAndHoldGesture));
+            if (hold && hold->state() == Qt::GestureFinished) {
+                triggerLongPress();
+                gestureEvent->accept(hold);
+                return true;
+            }
+            return false;
+        }
+        case QEvent::TouchBegin:
+            begin(nm_main_tab_touch_position(static_cast<QTouchEvent *>(event)));
+            return false;
+        case QEvent::TouchUpdate:
+            move(nm_main_tab_touch_position(static_cast<QTouchEvent *>(event)));
+            return false;
+        case QEvent::TouchEnd:
+        case QEvent::TouchCancel:
+            finish();
+            return false;
+        case QEvent::MouseButtonPress: {
+            auto *mouse = static_cast<QMouseEvent *>(event);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 3, 0)
+            if (mouse->button() == Qt::LeftButton && mouse->source() == Qt::MouseEventNotSynthesized)
+#else
+            if (mouse->button() == Qt::LeftButton)
+#endif
+                begin(nm_main_tab_mouse_position(mouse));
+            return false;
+        }
+        case QEvent::MouseMove:
+            move(nm_main_tab_mouse_position(static_cast<QMouseEvent *>(event)));
+            return false;
+        case QEvent::MouseButtonRelease:
+            if (static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) finish();
+            return false;
+        case QEvent::ApplicationDeactivate:
+        case QEvent::WindowDeactivate:
+            timer.stop();
+            pressed = false;
+            return false;
+        default:
+            return false;
+        }
+    }
+private:
+    void begin(const QPoint &position) {
+        timer.stop();
+        pressed = true;
+        longConsumed = false;
+        pressPosition = position;
+        timer.start();
+    }
+    void move(const QPoint &position) {
+        if (pressed && (position - pressPosition).manhattanLength() > 30) {
+            timer.stop();
+            pressed = false;
+        }
+    }
+    void finish() {
+        timer.stop();
+        pressed = false;
+    }
+    void triggerLongPress() {
+        if (!pressed || longConsumed || !button) return;
+        timer.stop();
+        longConsumed = true;
+        if (longPress) longPress();
+    }
+    QPointer<QWidget> button;
+    std::function<void()> tap;
+    std::function<void()> longPress;
+    QTimer timer;
+    QPoint pressPosition;
+    bool pressed = false;
+    bool longConsumed = false;
+};
+
 static void main_nav_button_configure(MainNavButton *btn, const char *label, const char *icon, const char *icon_fallback, const char *icon_active, const char *icon_active_fallback) {
     if (label && MainNavButton_setText) {
         MainNavButton_setText(btn, label);
@@ -1988,12 +2287,17 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
     }
 
     MainNavButton_MainNavButton(btn, parent);
+    nm_configured_tab_override = nm_read_tab_override();
+    const char *configuredLabel = nm_global_config_experimental("menu_main_15505_label");
+    const QString bottomTabLabel = nm_configured_tab_override && !nm_configured_tab_override->displayLabel.isEmpty()
+        ? nm_configured_tab_override->displayLabel
+        : QString::fromUtf8(configuredLabel ? configuredLabel : "Nickelite");
     const char *inactiveIcon = "/tmp/nm_menu_inactive_icon.png";
     const char *activeIcon = "/tmp/nm_menu_active_icon.png";
     const bool hasInactiveIcon = nm_write_default_icon(inactiveIcon, 0);
     const bool hasActiveIcon = nm_write_default_icon(activeIcon, 1);
     main_nav_button_configure(btn,
-        nm_global_config_experimental("menu_main_15505_label") ?: "Nickelite",
+        bottomTabLabel.toUtf8().constData(),
         nm_global_config_experimental("menu_main_15505_icon") ?: (hasInactiveIcon ? inactiveIcon : nullptr),
         ":/images/home/main_nav_more.png",
         nm_global_config_experimental("menu_main_15505_icon_active") ?: (hasActiveIcon ? activeIcon : nullptr),
@@ -2008,7 +2312,7 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
     }
     sh->setVisible(false);
 
-    QWidget::connect(sh, &QPushButton::pressed, [btn] {
+    std::function<void()> openMenu = [btn] {
         if (!NickelTouchMenu_NickelTouchMenu || !MenuTextItem_MenuTextItem || !MenuTextItem_setText || !MenuTextItem_registerForTapGestures) {
             NM_LOG("could not find required NickelTouchMenu and MenuTextItem symbols for generating menu");
             nm_show_dialog(QLatin1String("Nickelite"), QLatin1String("Could not find required NickelTouchMenu and MenuTextItem symbols for generating menu (this is a bug)."));
@@ -2111,10 +2415,30 @@ static void nm_main_nav_inject(MainNavView *_this, QWidget *parent) {
         NM_LOG("showing menu");
 
         QWidget::connect(menu, &QMenu::aboutToHide, menu, &QWidget::deleteLater);
-
         menu->ensurePolished();
         menu->popup(btn->mapToGlobal(btn->geometry().topRight() - QPoint(0, menu->sizeHint().height())));
-    });
+    };
+
+    std::function<void()> tapAction = [openMenu] {
+        if (nm_configured_tab_override) {
+            const nm_action_fn_t action = nm_configured_tab_override->action.act;
+            const char *argument = nm_configured_tab_override->action.arg;
+            const bool missingKOReader = action == NM_ACTION(cmd_spawn)
+                && !std::strcmp(argument, "quiet:exec /mnt/onboard/.adds/koreader/koreader.sh")
+                && !nm_koreader_available();
+            if (missingKOReader) {
+                NM_LOG("Configured KOReader launcher is missing; opening NickelMenu for recovery");
+                openMenu();
+                return;
+            }
+            nm_menu_item_do(&nm_configured_tab_override->item, nullptr, nullptr, true);
+            return;
+        }
+        openMenu();
+    };
+
+    auto *gesture = new NmMainTabGesture(btn, tapAction, openMenu);
+    QWidget::connect(sh, &QPushButton::pressed, [gesture] { gesture->handleTap(); });
 
     bl->addWidget(btn, 1);
     _this->ensurePolished();
@@ -2441,7 +2765,11 @@ void _nm_menu_inject(void *nmc, QMenu *menu, nm_menu_location_t loc, int at) {
     menu->setProperty("nm_config_rev", rev_n);
 }
 
-void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *argtransform_data) {
+void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *argtransform_data,
+                     bool bypassPermissions) {
+#if NM_QT_MAJOR < 6
+    (void)bypassPermissions;
+#endif
     const char *err = NULL;
     bool success = true;
     int skip = 0;
@@ -2471,8 +2799,10 @@ void nm_menu_item_do(nm_menu_item_t *it, nm_argtransform_t argtransform, void *a
         }
         if (arg) {
 #if NM_QT_MAJOR >= 6
-            const char *feature = nm_feature_for_action(cur->act, arg);
-            if (feature && !nm_feature_enabled(feature))
+            nm_menu_action_t checkedAction = *cur;
+            checkedAction.arg = const_cast<char *>(arg);
+            const char *feature = nullptr;
+            if (nm_action_permission_blocked(&checkedAction, bypassPermissions, nm_feature_enabled, &feature))
                 nm_err_set("%s is disabled in Nickelite Settings", nm_feature_label(feature));
             else
 #endif
