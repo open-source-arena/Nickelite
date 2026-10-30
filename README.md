@@ -2,11 +2,11 @@
 
 Nickelite adds a configurable menu and a native Settings view to Kobo's Nickel reader software. It runs on the **Qt 6 based Kobo firmware 5+**. Firmware 4.x is outside this project's support scope.
 
-Screenshots: Menu, Menu items, and Permissions are 1.1.1 simulator captures; Shortcuts is a physical Clara BW running 1.2.0. The physical image shows KOReader absent, as expected when its launcher is not installed. The simulator could not render Settings for refreshed captures.
+Screenshots: Menu, Menu items, and Permissions are 1.1.1 simulator captures; Shortcuts is a physical Clara BW running a pre-release 1.2.0 candidate. The photo shows KOReader absent, as expected when its launcher is not installed. The reviewed release package was staged, but its post-update device response is unconfirmed. The simulator could not render Settings for refreshed captures.
 
 [Menu](docs/screenshots/main-menu.png) · [Shortcuts](docs/screenshots/settings-shortcuts.jpg) · [Menu items](docs/screenshots/settings-menu-items.png) · [Permissions](docs/screenshots/settings-permissions.png)
 
-<p align="center"><img src="docs/screenshots/settings-shortcuts.jpg" alt="Nickelite 1.2.0 Shortcuts on a physical Kobo Clara BW, with KOReader absent" width="50%"></p>
+<p align="center"><img src="docs/screenshots/settings-shortcuts.jpg" alt="Pre-release Nickelite 1.2.0 candidate Shortcuts on a physical Kobo Clara BW, with KOReader absent" width="50%"></p>
 
 ## What it does
 
@@ -23,7 +23,7 @@ Kobo Clara BW (N365) does not normally show Dropbox or Google Drive in its More 
 | Firmware | Package | Evidence |
 | --- | --- | --- |
 | 5.18.270971 | `Nickelite-1.2.0-firmware-5.18.270971.zip` | Qt 6 cross-build and ARM compatibility checks passed in QEMU; the unsupported-firmware guard passed. Settings UI could not be checked in QEMU. |
-| 6.0.279225 | `Nickelite-1.2.0-firmware-6.0.279225.zip` | Qt 6 cross-build and ARM compatibility checks passed in QEMU. On a physical Clara BW (N365), Home remained responsive, Settings views opened, and absent KOReader/KFMon rows stayed hidden. KFMon-installed state could not be verified because firmware 6’s `/usr/local/Kobo` overlay did not install its daemon at `/usr/local/kfmon`, the expected path. |
+| 6.0.279225 | `Nickelite-1.2.0-firmware-6.0.279225.zip` | Qt 6 cross-build and ARM compatibility checks passed in QEMU. A pre-release 1.2.0 candidate kept Home responsive, opened all Settings views, and hid absent KOReader/KFMon rows on a physical Clara BW (N365). The reviewed release package was staged, but its post-update response is unconfirmed. KFMon-installed state could not be verified because firmware 6’s `/usr/local/Kobo` overlay did not install its daemon at `/usr/local/kfmon`, the expected path. |
 
 These are the **pinned firmware builds** for the 1.2.0 downloads. Other firmware 5.x/6.x builds and Kobo models need separate compatibility checks. The only physical model tested so far is **Kobo Clara BW**. The simulator runs genuine Nickel in QEMU userspace; it does not emulate Kobo hardware. See the [compatibility matrix](docs/feature-matrix.md), [6.0 results](docs/firmware-6.0.279225.md), and [simulator guide](docs/emulator/real-cloud.md).
 

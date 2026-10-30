@@ -12,10 +12,12 @@ The Qt 6 cross-build completed with `make -j8 all kobo test/qt_compat test/compa
 `test/compat` and `test/qt_compat` passed in the 6.0.279225 guest; both also
 passed in the 5.18.270971 guest with
 `NM_TEST_UNSUPPORTED_FIRMWARE=1` for the firmware guard. The UI smoke check could not be completed because the available QEMU guests
-rendered a blank screen. A physical N365 check confirmed Home and all three
-Settings views remained responsive, KOReader and KFMon rows were hidden when
-both launchers were absent, and Menu items spacing was even. The Menu items and Permissions screenshots remain 1.1.1 simulator captures; the
-Shortcuts screenshot now documents the physical 1.2.0 absent-KOReader state. A
+rendered a blank screen. A physical N365 check on a pre-release 1.2.0 candidate confirmed Home and all
+three Settings views remained responsive, KOReader and KFMon rows were hidden when
+both launchers were absent, and Menu items spacing was even. The reviewed
+release package was staged, but its post-update response is unconfirmed. The
+Menu items and Permissions screenshots remain 1.1.1 simulator captures; the
+Shortcuts screenshot documents the physical pre-release candidate state. A
 physical KFMon-installed check remains unavailable:
 KFMon’s upstream package ships a rootfs `KoboRoot.tgz`, while firmware 6’s
 `Kobo.tgz` overlay targets `/usr/local/Kobo`, and did not install the daemon
