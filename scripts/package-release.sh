@@ -16,4 +16,6 @@ for firmware in 5.18.270971 6.0.279225; do
   name="Nickelite-$version-firmware-$firmware.zip"
   (cd "$tmp/$firmware" && zip -q "$root/dist/$version/$name" ./*)
 done
+(cd dist/kfmon && sha256sum -c SHA256SUMS)
+cp dist/kfmon/*.zip "dist/$version/"
 (cd "dist/$version" && sha256sum *.zip > SHA256SUMS)

@@ -19,11 +19,15 @@ jobs:
         test -d "dist/$version"
         cd "dist/$version"
         sha256sum -c SHA256SUMS
-        for package in *.zip; do
+        for package in Nickelite-*.zip; do
           work="$(mktemp -d)"
           unzip -q "$package" -d "$work"
           (cd "$work" && sha256sum -c SHA256SUMS)
         done
+        for package in KFMon-Nickelite-Install.zip KFMon-Nickelite-Uninstall.zip; do
+          test "$(unzip -Z1 "$package")" = '.kobo/update.tar'
+        done
+        unzip -Z1 KFMon-Nickelite-Defaults.zip | grep -Fx 'Nickelite-KFMon-defaults/nickelite-defaults.sh'
     - name: Publish release assets
       env:
         GH_TOKEN: ${{ github.token }}
@@ -31,12 +35,13 @@ jobs:
         version="${GITHUB_REF_NAME#v}"
         if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
           gh release upload "$GITHUB_REF_NAME" "dist/$version/"*.zip "dist/$version/SHA256SUMS" \
-            scripts/install.sh scripts/install.ps1 --repo "$GITHUB_REPOSITORY" --clobber
+            scripts/install.sh scripts/install.ps1 scripts/install-kfmon.sh scripts/install-kfmon.ps1 \
+            --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "Nickelite $version" --notes-file "dist/$version/RELEASE.md"
         else
           gh release create "$GITHUB_REF_NAME" "dist/$version/"*.zip "dist/$version/SHA256SUMS" \
-            scripts/install.sh scripts/install.ps1 \
+            scripts/install.sh scripts/install.ps1 scripts/install-kfmon.sh scripts/install-kfmon.ps1 \
             --repo "$GITHUB_REPOSITORY" --verify-tag --title "Nickelite $version" \
             --notes-file "dist/$version/RELEASE.md"
         fi

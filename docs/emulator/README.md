@@ -23,6 +23,22 @@ KFMon’s upstream package ships a rootfs `KoboRoot.tgz`, while firmware 6’s
 `Kobo.tgz` overlay targets `/usr/local/Kobo`, and did not install the daemon
 at its expected `/usr/local/kfmon` path. No KFMon payload is included in Nickelite.
 
+## Nickelite 1.3.0 KFMon package checks (2026-10-30)
+
+This later check supersedes the 1.2.0 KFMon availability note above. A separate
+Nickelite KFMon fork asset now installs through `.kobo/update.tar`; it is not
+bundled in NickelMenu's `.kobo/Kobo.tgz` overlay. Install and uninstall stage1
+passed isolated OTA harnesses for firmware 5.18.270971 and 6.0.279225. The
+daemon's FBInk initialization still cannot run in the headless guests because
+they do not expose `/dev/fb0`.
+
+On a physical Clara BW (N365) with firmware 6.0.279225, the separate updater
+completed and Nickelite showed its installed-only KFMon permission and generator
+control. A configured IPC-only watch appeared in the generated list; its safe
+`/bin/true` action returned a success notification. The disposable watch was
+removed afterward. Physical firmware 5 installation, firmware 6 uninstall, and
+rollback remain untested.
+
 ## Nickelite 1.1.1 screenshot check (2026-10-29)
 
 The Shortcuts, Menu items, and Permissions screenshots were recaptured on the

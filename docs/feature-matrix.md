@@ -1,4 +1,4 @@
-# Upstream NickelMenu v0.6.0 compared with Nickelite 1.1.1 on Kobo 5+
+# Upstream NickelMenu v0.6.0 compared with Nickelite 1.3.0 on Kobo 5+
 
 This inventory uses the upstream [v0.6.0 documentation](https://github.com/pgaskin/NickelMenu/tree/v0.6.0), its tagged `Makefile` and source, plus this branch's action registry and the [physical compatibility report](firmware-6.0.279225.md). “Implemented” means the action exists and checks its runtime dependencies; it does not mean every subaction was tested on the N365. The physical results below apply to Clara BW (N365) on 6.0.279225.
 
@@ -31,9 +31,9 @@ for a full-rootfs replacement.
 | Action chains: success, failure, always, and `skip` | Implemented; disabled features fail normally so `chain_failure` can run. | Configure chains; `skip` stays available for recovery. |
 | Selection substitution and transforms | Implemented, including the corrected `u` and `x` flags. | Use selection menu entries. |
 | `cmd_spawn` and `cmd_output` | Implemented; command execution itself is not a Kobo 6 compatibility guarantee. | **Commands and output** switch; add config entries. |
-| KOReader launcher | Ready-made `cmd_spawn` shortcut uses KOReader's standard Kobo script. KOReader must be installed separately; actual launch has not been verified on a physical device. | Install KOReader under `.adds/koreader`, then turn on **KOReader** in Shortcuts. |
+| KOReader launcher | Ready-made `cmd_spawn` shortcut uses KOReader's standard Kobo script. KOReader must be installed separately. On N365 firmware 6, v2026.07.1 launched and responded; `Exit > Exit` froze during boot animation, while `Exit > Reboot device` returned to Nickel. | Install KOReader under `.adds/koreader`, then turn on **KOReader** in Shortcuts. KOReader is not bundled. |
 | `dbg_syslog`, `dbg_error`, `dbg_msg`, `dbg_toast` | Implemented; always available for diagnostics and config errors. | Add config entries. |
-| `kfmon`, `kfmon_id`, and KFMon menu generator | Implemented; requires KFMon installed separately. | **KFMon launchers** switch; add action or generator entries. |
+| `kfmon`, `kfmon_id`, and KFMon menu generator | Implemented; requires KFMon installed separately. A Nickelite KFMon fork package installed and passed an IPC-only generator/action check on physical N365 firmware 6.0.279225; firmware 5.18 OTA stage1 was simulated only. | Use the optional KFMon installer in the release, then add action or generator entries. |
 | `_test` numbered menu generator | Implemented as a configuration test utility. | Add `generator:_test` with its location and count. |
 | `nickel_setting`: invert, lockscreen, force Wi-Fi | Implemented with native ABI checks; hardware and preference effects need physical checks. | **Device settings** switch; add entries. |
 | `nickel_setting:dark_mode` | Implemented; reader appearance passed the 6.0.274403 simulator test. | **Dark mode** switch; add entry. |

@@ -1,8 +1,13 @@
 #!/bin/sh
 set -eu
 
+if [ "${1:-}" = "--kfmon" ]; then
+  shift
+  exec "$(dirname "$0")/install-kfmon.sh" "$@"
+fi
+
 repo=open-source-arena/Nickelite
-version=1.2.0
+version=1.3.0
 mount=${1:?Usage: install.sh /path/to/KOBOeReader [versioned-package.zip]}
 [ -f "$mount/.kobo/version" ] || { echo 'Kobo storage is not mounted at that path.' >&2; exit 1; }
 firmware=$(cut -d, -f3 "$mount/.kobo/version" | tr -d '\r\n')
@@ -10,6 +15,9 @@ case "$firmware" in
   5.18.270971|6.0.279225) ;;
   *) echo "No tested package for firmware $firmware" >&2; exit 1 ;;
 esac
+for pending in "$mount/.kobo/Kobo.tgz" "$mount/.kobo/KoboRoot.tgz" "$mount/.kobo/update.tar" "$mount/.kobo/update.tar.tmp"; do
+  [ ! -e "$pending" ] || { echo "Another updater is staged at $pending. Let it finish before installing Nickelite." >&2; exit 1; }
+done
 asset="Nickelite-${version}-firmware-${firmware}.zip"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM

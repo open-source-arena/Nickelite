@@ -1,14 +1,24 @@
 param(
     [Parameter(Mandatory=$true)][string]$KoboDrive,
-    [string]$Package
+    [string]$Package,
+    [switch]$KFMon
 )
 $ErrorActionPreference = 'Stop'
-$version = '1.2.0'
+if ($KFMon) {
+    $installer = Join-Path $PSScriptRoot 'install-kfmon.ps1'
+    if ($Package) { & $installer -KoboDrive $KoboDrive -Package $Package }
+    else { & $installer -KoboDrive $KoboDrive }
+    return
+}
+$version = '1.3.0'
 $root = (Resolve-Path $KoboDrive).Path
 $versionFile = Join-Path $root '.kobo/version'
 if (-not (Test-Path $versionFile)) { throw 'Kobo storage is not mounted at that path.' }
 $firmware = ((Get-Content $versionFile -Raw).Split(','))[2].Trim()
 if ($firmware -notin @('5.18.270971', '6.0.279225')) { throw "No tested package for firmware $firmware" }
+foreach ($name in @('Kobo.tgz', 'KoboRoot.tgz', 'update.tar', 'update.tar.tmp')) {
+    if (Test-Path (Join-Path $root ".kobo/$name")) { throw "Another updater is staged at .kobo/$name. Let it finish before installing Nickelite." }
+}
 $asset = "Nickelite-$version-firmware-$firmware.zip"
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory $temp | Out-Null
