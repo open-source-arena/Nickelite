@@ -39,7 +39,7 @@ int main(void) {
 } while (0);
     NM_ACTIONS
 #undef X
-    assert(count == 20);
-    assert(unsupported == (NM_QT_MAJOR == 6 ? 2 : 0));
+    assert(count == 21);
+    assert(unsupported == (NM_QT_MAJOR == 6 ? 2 : 1));
     return 0;
 }
