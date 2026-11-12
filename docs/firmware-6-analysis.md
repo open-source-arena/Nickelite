@@ -75,7 +75,7 @@ on-device execution. No proprietary instruction listings are included here.
 
 ## Historical baseline acceptance results
 
-The baseline implementation reused the credited Qt6 fork identified in the README and vendors its NickelHook dependency. The local loader correction restores each GOT page's original protection, preserves originally writable lazy-binding pages, and rolls the pointer back if restoring protection fails. Independent review accepted this correction and the scoped 6.0.274403 port.
+The baseline implementation reused the credited Qt6 fork identified in the README and carried NickelHook as a vendored copy; the same source is now pinned as a submodule from the open-source-arena NickelHook fork. The local loader correction restores each GOT page's original protection, preserves originally writable lazy-binding pages, and rolls the pointer back if restoring protection fails. Independent review accepted this correction and the scoped 6.0.274403 port.
 
 Baseline lead checks passed on 2026-10-26:
 

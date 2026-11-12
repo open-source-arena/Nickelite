@@ -123,6 +123,8 @@ For hand editing, add a separate text file under `.adds/nm`; do not edit `.adds/
 
 ## Build and simulator
 
+Source builds require the pinned NickelHook submodule. Clone with `git clone --recurse-submodules https://github.com/open-source-arena/Nickelite.git` or run `git submodule update --init --recursive` after cloning. The submodule pin records the tested code revision.
+
 On Linux, build the Qt 6 SDK and package with Docker:
 
 ```sh
@@ -137,4 +139,4 @@ The SDK build downloads Qt source and takes substantial time and disk space. The
 
 ## Origins and license
 
-Nickelite began as a fork of [Patrick Gaskin's NickelMenu](https://github.com/pgaskin/NickelMenu), with Qt 6 port work from [Nico Verbruggen](https://github.com/nicoverbruggen/NickelMenu) and the vendored [NickelHook](https://github.com/nicoverbruggen/NickelHook). The menu editor, native Settings view, permissions, tested cloud routes, firmware 5+/6 compatibility work, packaging, and simulator workflow are additions in this project. That wider scope calls for a name distinct from the original, so readers can tell its packages and support claims apart. **Nickelite** refers to the Nickel firmware through a material-inspired name, fitting an extension built on Nickel rather than another edition of NickelMenu. Nickelite is released under the [MIT License](LICENSE), retaining the original authorship notice. Vendored third-party code keeps its own notices, including the BSD-2-Clause notice in `src/kfmon_helpers.h`.
+Nickelite began as a fork of [Patrick Gaskin's NickelMenu](https://github.com/pgaskin/NickelMenu), with Qt 6 port work from [Nico Verbruggen](https://github.com/nicoverbruggen/NickelMenu) and a pinned [NickelHook submodule](https://github.com/open-source-arena/NickelHook). The submodule is a direct fork of [Patrick Gaskin's original NickelHook](https://github.com/pgaskin/NickelHook); it carries the Qt 6 and firmware 5.18/6.0 build support used by Nickelite, with the ItaloBorrelli reference changes and provenance retained. Hook-library infrastructure does not certify a mod's private symbols, object layouts, or runtime behavior on every firmware. The menu editor, native Settings view, permissions, tested cloud routes, packaging, and simulator workflow are additions in this project. That wider scope calls for a name distinct from the original, so readers can tell its packages and support claims apart. **Nickelite** refers to the Nickel firmware through a material-inspired name, fitting an extension built on Nickel rather than another edition of NickelMenu. Nickelite is released under the [MIT License](LICENSE), retaining the original authorship notice. Third-party code keeps its own notices, including the MIT notice in the NickelHook submodule and the BSD-2-Clause notice in `src/kfmon_helpers.h`.
